@@ -1,15 +1,21 @@
 # Segurança
 
-O AntiGolpe usa três camadas. A Camada 3 é determinística. O MVP não visita URLs, não executa conteúdo remoto e não registra payloads.
+O AntiGolpe usa três camadas. A Camada 3 é 100% determinística. O MVP não visita URLs, não executa conteúdo remoto e não registra payloads.
 
 ## Controles
 - validação Pydantic com campos fechados;
-- sanitização de PII e URLs;
-- rate limiting com hash de IP e TTL lógico;
+- sanitização de PII e URLs de entrada;
+- sanitização de PII na saída antes da renderização;
+- rate limiting com hash de IP e TTL lógico, usando salt configurável ou aleatório por processo;
 - saída validada antes da renderização;
 - nenhuma credencial no frontend;
 - prevenção de prompt injection por separação entre dado e instrução;
 - fallback determinístico para linguagem proibida.
 
-## Limitação conhecida
-A sanitização automática não identifica todas as formas de informação pessoal contextual. A UX orienta o usuário a não enviar credenciais e dados altamente sensíveis.
+## Limitações conhecidas
+- A sanitização automática não identifica todas as formas de informação pessoal contextual.
+- O rate limiter atual é em memória e não é compartilhado entre múltiplas instâncias do serviço.
+- O provider real ainda não foi integrado; o MVP usa MockProvider.
+- O sistema não verifica o conteúdo das URLs, apenas sua representação textual/estrutural.
+
+A UX orienta o usuário a não enviar credenciais e dados altamente sensíveis.

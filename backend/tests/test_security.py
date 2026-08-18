@@ -39,8 +39,13 @@ def test_output_pii_is_redacted():
     assert "123e4567-e89b-12d3-a456-426614174000" not in combined
 
 
-def test_pix_incident_protocol():
+def test_pix_incident_protocol_requires_fraud_context():
     steps = incident_protocol(UserState.JA_FUI_VITIMA, "Acabei de fazer um Pix")
+    assert not any("MED" in step for step in steps)
+
+
+def test_pix_incident_protocol_on_suspected_fraud():
+    steps = incident_protocol(UserState.JA_FUI_VITIMA, "Acabei de fazer um Pix, acho que foi golpe")
     assert any("MED" in step for step in steps)
     assert any("banco" in step for step in steps)
 

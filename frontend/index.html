@@ -1,1 +1,61 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AntiGolpe</title><link rel="stylesheet" href="/assets/style.css"></head><body><main class="container"><header><h1>Recebeu algo suspeito?</h1><p>Analise a situação antes de agir. O AntiGolpe não promete segurança absoluta.</p></header><section class="states"><button data-state="AINDA_NAO_AGI">Recebi algo estranho</button><button data-state="ESTOU_EM_DUVIDA">Estou em dúvida</button><button data-state="JA_AGI">Já cliquei / respondi</button><button class="emergency" data-state="JA_FUI_VITIMA">JÁ FUI VÍTIMA</button></section><form id="analysis-form"><label>Mensagem ou contexto<textarea id="text" maxlength="12000" placeholder="Cole a mensagem ou descreva a situação."></textarea></label><label>URL (opcional)<input id="url" maxlength="4096" inputmode="url" placeholder="https://..."></label><label>Contexto adicional (opcional)<textarea id="situation" maxlength="4000"></textarea></label><p class="privacy">Evite enviar senhas, códigos de autenticação, cartões completos ou outras informações altamente sensíveis.</p><button class="primary" type="submit">Analisar situação</button></form><section id="result" class="result" hidden></section></main><script src="/assets/app.js" defer></script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="AntiGolpe ajuda você a tomar decisões mais seguras diante de possíveis fraudes.">
+  <title>AntiGolpe</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <p class="eyebrow">ANTIGOLPE</p>
+      <h1>Recebeu algo suspeito?</h1>
+      <p>Analise a situação antes de agir. O AntiGolpe não promete segurança absoluta e pode dizer quando não é possível determinar.</p>
+    </header>
+
+    <section aria-labelledby="state-title">
+      <h2 id="state-title" class="sr-only">Em que situação você está?</h2>
+      <div class="states">
+        <button type="button" data-state="AINDA_NAO_AGI">Recebi algo estranho</button>
+        <button type="button" data-state="ESTOU_EM_DUVIDA">Estou em dúvida</button>
+        <button type="button" data-state="JA_AGI">Já cliquei / respondi</button>
+        <button type="button" class="emergency" data-state="JA_FUI_VITIMA">JÁ FUI VÍTIMA</button>
+      </div>
+    </section>
+
+    <section id="incident-quick" class="quick-incident" hidden aria-live="polite">
+      <h2>Se você já foi vítima</h2>
+      <p>Priorize contenção. Não continue negociando com o possível fraudador.</p>
+      <ul>
+        <li>Preserve comprovantes, mensagens e demais evidências.</li>
+        <li>Procure imediatamente o banco ou instituição pelo canal oficial.</li>
+        <li>Não forneça novos códigos, senhas ou taxas para “liberar” valores.</li>
+      </ul>
+      <p class="notice">Para Pix, o fluxo de MED depende do caso e deve ser solicitado ao banco quando aplicável.</p>
+    </section>
+
+    <form id="analysis-form" novalidate>
+      <fieldset>
+        <legend>Conte o que aconteceu</legend>
+        <label for="text">Mensagem ou situação
+          <textarea id="text" maxlength="12000" placeholder="Cole a mensagem ou descreva o que aconteceu."></textarea>
+        </label>
+        <label for="url">URL (opcional)
+          <input id="url" maxlength="4096" inputmode="url" autocomplete="off" placeholder="https://...">
+        </label>
+        <label for="situation">Contexto adicional (opcional)
+          <textarea id="situation" maxlength="4000" placeholder="Ex.: já fiz o Pix; cliquei no link; recebi por WhatsApp..."></textarea>
+        </label>
+      </fieldset>
+
+      <p class="privacy">Evite enviar senhas, códigos de autenticação, cartões completos ou outras informações altamente sensíveis.</p>
+      <button class="primary" type="submit">Analisar situação</button>
+    </form>
+
+    <section id="result" class="result" hidden aria-live="polite" aria-atomic="true"></section>
+  </main>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

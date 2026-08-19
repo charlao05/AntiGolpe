@@ -1,1 +1,79 @@
-let state="ESTOU_EM_DUVIDA";const form=document.getElementById("analysis-form"),result=document.getElementById("result");document.querySelectorAll("[data-state]").forEach(b=>b.addEventListener("click",()=>{state=b.dataset.state;document.querySelectorAll("[data-state]").forEach(x=>x.classList.remove("selected"));b.classList.add("selected")}));function esc(v){return String(v).replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}function list(t,a){return a&&a.length?`<h3>${esc(t)}</h3><ul>${a.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}form.addEventListener("submit",async e=>{e.preventDefault();result.hidden=false;result.innerHTML="<p>Analisando...</p>";const body={state,text:document.getElementById("text").value,url:document.getElementById("url").value||null,situation:document.getElementById("situation").value||null};try{const r=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}),d=await r.json();if(!r.ok)throw new Error(d.detail||"Falha na análise");result.innerHTML=`<h2>${esc(d.risk_level.replaceAll("_"," "))}</h2><p>${esc(d.summary)}</p>`+list("Sinais encontrados",d.signals)+list("Evidências",d.evidence)+list("O que fazer",d.safe_actions)+list("O que não fazer",d.avoid_actions)+list("Como verificar",d.independent_verification)+list("Incertezas",d.uncertainties)+list("Protocolo de incidente",d.incident_protocol)}catch(err){result.innerHTML=`<p role="alert">${esc(err.message)}</p>`}});
+const DEFAULT_STATE = "ESTOU_EM_DUVIDA";
+let state = DEFAULT_STATE;
+
+const form = document.getElementById("analysis-form");
+const result = document.getElementById("result");
+const quickIncident = document.getElementById("incident-quick");
+const stateButtons = [...document.querySelectorAll("[data-state]")];
+
+function esc(value) {
+  return String(value ?? "").replace(/[&<>\"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  }[char]));
+}
+
+function list(title, values) {
+  if (!Array.isArray(values) || values.length === 0) return "";
+  return `<h3>${esc(title)}</h3><ul>${values.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`;
+}
+
+function selectState(nextState) {
+  state = nextState;
+  stateButtons.forEach((button) => {
+    button.classList.toggle("selected", button.dataset.state === state);
+  });
+  quickIncident.hidden = state !== "JA_FUI_VITIMA";
+  if (state === "JA_FUI_VITIMA") {
+    document.getElementById("text").focus();
+  }
+}
+
+stateButtons.forEach((button) => {
+  button.addEventListener("click", () => selectState(button.dataset.state));
+});
+
+selectState(DEFAULT_STATE);
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  result.hidden = false;
+  result.innerHTML = "<p role=\"status\">Analisando a situação...</p>";
+
+  const body = {
+    state,
+    text: document.getElementById("text").value,
+    url: document.getElementById("url").value.trim() || null,
+    situation: document.getElementById("situation").value.trim() || null
+  };
+
+  try {
+    const response = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || "Não foi possível concluir a análise.");
+
+    const risk = esc(String(data.risk_level || "NAO_DETERMINADO").replaceAll("_", " "));
+    result.innerHTML = `
+      <div class="risk-badge">${risk}</div>
+      <h2>Orientação</h2>
+      <p>${esc(data.summary)}</p>
+      ${list("Sinais encontrados", data.signals)}
+      ${list("Evidências", data.evidence)}
+      ${list("O que fazer agora", data.safe_actions)}
+      ${list("O que não fazer", data.avoid_actions)}
+      ${list("Como verificar", data.independent_verification)}
+      ${list("Incertezas", data.uncertainties)}
+      ${list("Protocolo de incidente", data.incident_protocol)}
+    `;
+  } catch (error) {
+    result.innerHTML = `<p role="alert">${esc(error.message)}</p>`;
+  }
+});

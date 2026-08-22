@@ -1,0 +1,1 @@
+Phase 3 Render validation: synthetic data only, MockProvider only, real provider blocked until Provider Gate approval.

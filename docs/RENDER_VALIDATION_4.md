@@ -1,0 +1,1 @@
+Render validation uses synthetic data only; real LLM integration remains blocked until Provider Gate approval.

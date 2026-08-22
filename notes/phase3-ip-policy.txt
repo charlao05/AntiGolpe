@@ -1,1 +1,0 @@
-Phase 3 IP policy: prefer CF-Connecting-IP, then first X-Forwarded-For value per Render deployment topology, then request connection IP. This file is temporary audit documentation for the branch.

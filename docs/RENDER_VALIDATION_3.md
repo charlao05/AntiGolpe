@@ -1,0 +1,1 @@
+Temporary note: Render validation must use synthetic data only until Provider Gate approval.

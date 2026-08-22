@@ -18,6 +18,16 @@ safety = SafetyEngine()
 limiter = RateLimiter()
 
 
+def client_ip(connection_ip: str, headers) -> str:
+    """Resolve the client IP as forwarded by Render's proxy, with a safe fallback."""
+    forwarded = headers.get("x-forwarded-for") if headers else None
+    if forwarded:
+        first = forwarded.split(",", 1)[0].strip()
+        if first:
+            return first
+    return connection_ip or "unknown"
+
+
 def deterministic_incident_result(protocol: list[str]) -> AnalysisResult:
     return AnalysisResult(
         risk_level=RiskLevel.ALTO_RISCO,
@@ -39,7 +49,8 @@ def health():
 
 @app.post("/api/analyze", response_model=AnalysisResult)
 def analyze(payload: AnalyzeRequest, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    connection_ip = request.client.host if request.client else "unknown"
+    ip = client_ip(connection_ip, request.headers)
     if not limiter.allowed(ip):
         raise HTTPException(status_code=429, detail="Limite temporário atingido. Tente novamente mais tarde.")
 

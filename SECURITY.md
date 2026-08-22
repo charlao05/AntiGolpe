@@ -12,6 +12,14 @@ O AntiGolpe usa três camadas. A Camada 3 é 100% determinística. O MVP não vi
 - prevenção de prompt injection por separação entre dado e instrução;
 - fallback determinístico para linguagem proibida.
 
+## Render e proxy reverso
+
+O Render coloca Web Services atrás de Cloudflare e de seus load balancers. Para rate limiting, o AntiGolpe usa o primeiro valor de `X-Forwarded-For` como identidade do cliente e cai para o endereço de conexão quando o cabeçalho não está presente. Essa é uma premissa específica da infraestrutura de produção e deve ser revalidada se outro proxy ou CDN for colocado à frente do serviço.
+
+## Logs e observabilidade
+
+A aplicação não deve registrar corpos de requisição, prompts, respostas, credenciais ou PII. O Render pode produzir logs HTTP de infraestrutura que incluem método, status, URL solicitada e identificadores de requisição conforme o plano/configuração; isso não muda a obrigação de manter os logs da aplicação sem conteúdo sensível.
+
 ## Limitações conhecidas
 - A sanitização automática não identifica todas as formas de informação pessoal contextual.
 - O rate limiter atual é em memória e não é compartilhado entre múltiplas instâncias do serviço.

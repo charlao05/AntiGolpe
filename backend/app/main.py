@@ -32,6 +32,26 @@ def deterministic_incident_result(protocol: list[str]) -> AnalysisResult:
     )
 
 
+def client_ip(request: Request) -> str:
+    """Resolve the client IP for the Render/Cloudflare deployment topology.
+
+    Prefer Cloudflare's trusted visitor-IP header, then Render's documented
+    first X-Forwarded-For value, and finally the direct socket address.
+    """
+    headers = request.headers
+    cf_ip = headers.get("cf-connecting-ip")
+    if cf_ip and cf_ip.strip():
+        return cf_ip.strip()
+
+    forwarded = headers.get("x-forwarded-for")
+    if forwarded:
+        first = forwarded.split(",", 1)[0].strip()
+        if first:
+            return first
+
+    return request.client.host if request.client else "unknown"
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True, "provider": provider.metadata()}
@@ -39,7 +59,7 @@ def health():
 
 @app.post("/api/analyze", response_model=AnalysisResult)
 def analyze(payload: AnalyzeRequest, request: Request):
-    ip = request.client.host if request.client else "unknown"
+    ip = client_ip(request)
     if not limiter.allowed(ip):
         raise HTTPException(status_code=429, detail="Limite temporário atingido. Tente novamente mais tarde.")
 

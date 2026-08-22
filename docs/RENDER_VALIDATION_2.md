@@ -1,0 +1,1 @@
+Render validation checklist: verify Live status, /api/health provider.external=false, synthetic /api/analyze, all four states, rate limiting behind proxy, logs without payload/PII, provider gate remains closed.

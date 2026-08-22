@@ -1,0 +1,1 @@
+Phase 3 follow-ups: validate client IP headers against the live Render instance; use shared rate limiting before multi-instance scaling; keep provider gate closed until deploy validation.

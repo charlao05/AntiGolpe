@@ -1,0 +1,1 @@
+Render production note: web services sit behind Render/Cloudflare proxies. The application resolves rate-limit identity from the first X-Forwarded-For value and falls back to the direct connection address. Revalidate this assumption if the network topology changes.

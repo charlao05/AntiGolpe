@@ -1,11 +1,20 @@
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from backend.app.main import app
+from backend.app.main import app, client_ip
 from backend.app.sanitizers import sanitize_text, sanitize_url
 from backend.app.schema import AnalyzeRequest
 
 client = TestClient(app)
+
+
+def fake_request(connection_ip: str, headers: dict[str, str] | None = None):
+    return SimpleNamespace(
+        client=SimpleNamespace(host=connection_ip),
+        headers=headers or {},
+    )
 
 
 def test_sanitizers():
@@ -68,3 +77,23 @@ def test_all_four_states_are_accepted():
             'situation': None,
         })
         assert response.status_code == 200
+
+
+def test_client_ip_prefers_cloudflare_connecting_ip():
+    request = fake_request('10.0.0.5', {
+        'cf-connecting-ip': '203.0.113.10',
+        'x-forwarded-for': '198.51.100.2, 10.0.0.5',
+    })
+    assert client_ip(request) == '203.0.113.10'
+
+
+def test_client_ip_uses_render_first_forwarded_ip_when_cloudflare_header_absent():
+    request = fake_request('10.0.0.5', {
+        'x-forwarded-for': '198.51.100.2, 10.0.0.5',
+    })
+    assert client_ip(request) == '198.51.100.2'
+
+
+def test_client_ip_falls_back_to_connection_ip():
+    request = fake_request('10.0.0.5')
+    assert client_ip(request) == '10.0.0.5'

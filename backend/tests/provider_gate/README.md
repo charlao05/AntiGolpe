@@ -10,7 +10,13 @@ Arquivos atuais:
 
 - `runner.py` — carrega exatamente os 30 casos congelados e planeja as três fases experimentais.
 - `adapters.py` — contrato provider-neutral; adapters externos permanecem bloqueados.
+- `scoring.py` — estruturas D1-D6/E1-E4, sem julgamento automático nesta fase.
+- `cost_model.py` — estrutura provider-neutral de custos, sem preços hardcoded.
+- `latency.py` — estrutura provider-neutral de latência.
 - `test_runner.py` — testes do dry-run e da trava de autorização.
+- `SECURITY.md` — regras de segurança do sandbox.
+- `NOTES.md` — decisões de governança ainda pendentes.
+- `PLAN.md` — plano do experimento.
 
 ## Fases planejadas
 

@@ -27,13 +27,19 @@ import argparse
 import json
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
-BCB_ENDPOINT = (
+BCB_ENDPOINT_BASE = (
     "https://olinda.bcb.gov.br/olinda/servico/Pix_DadosAbertos/versao/v1/odata/"
-    "EstatisticasFraudesPix?$format=json&$orderby=AnoMes desc"
+    "EstatisticasFraudesPix"
 )
+BCB_QUERY = {
+    "$format": "json",
+    "$orderby": "AnoMes desc",
+}
+BCB_ENDPOINT = f"{BCB_ENDPOINT_BASE}?{urllib.parse.urlencode(BCB_QUERY)}"
 
 REQUEST_TIMEOUT_SECONDS = 20
 

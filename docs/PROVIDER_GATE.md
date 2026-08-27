@@ -426,3 +426,37 @@ Depois da aprovação, qualquer integração de provider deve ocorrer em PR isol
 - Contas/credenciais: **PENDENTE**.
 - Políticas de retenção por endpoint/plano: **PENDENTE de verificação documental atualizada**.
 
+
+
+---
+
+## 20. Decisões preenchidas — 2026-08-26
+
+Esta seção resolve os itens marcados como PENDENTE na Seção 19, conforme decisão humana registrada nesta data. Nenhuma execução real foi iniciada antes deste registro.
+
+### 20.1 Teto de gasto (resolve 7.1)
+
+- Orçamento máximo total do experimento: **US$ 10,00**.
+- Limite máximo por provider: **US$ 3,00** (considerando 3 providers candidatos nesta rodada).
+- Limite máximo por execução (por chamada/caso): **US$ 0,50**.
+- Ação ao atingir o limite: o harness deve interromper imediatamente novas chamadas, preservar os resultados já coletados e sinalizar o encerramento como "interrupção por teto de gasto" no log de execução (nunca silenciosamente).
+
+### 20.2 Contas (resolve 7.2)
+
+- Proprietário das contas: charlao05 (pessoa física, projeto individual).
+- Tipo de conta: pessoal, dedicada ao experimento (não compartilhada com outros projetos em produção).
+- Método de pagamento: a ser configurado diretamente em cada provider primário no momento da execução, nunca inserido em formulários ou repositórios pelo agente automatizado.
+- Uso de agregador (OpenRouter): mantido apenas como via de acesso técnico exploratório de baixo custo; **não substitui** a exigência da Seção 5 de análise específica do provider/modelo subjacente e suas políticas de retenção antes de qualquer aprovação final. Toda decisão de aprovação de provider (Seção 16/17) deve ser feita com base na política do provider primário, não do agregador.
+
+### 20.3 Ambiente de execução (resolve 8)
+
+- Opção adotada: **execução local controlada** (item 1 da lista de opções aceitáveis da Seção 8).
+- O harness roda fora do runtime de produção, em branch isolada `phase5-provider-sandbox`, nunca no Render.
+- Chave(s) de API mantidas em variável de ambiente local (`.env` não versionado); nenhuma chave em GitHub Actions secrets nesta fase, por não haver necessidade operacional de CI para o benchmark local.
+
+### 20.4 Política de retenção por endpoint/plano (resolve pendência da Seção 6.1 / 19)
+
+- Antes de qualquer chamada real, cada provider primário candidato (OpenAI, Anthropic, Google Gemini) terá sua política de retenção/treinamento verificada e documentada individualmente em `PROVIDER.md`, para o endpoint/plano exato utilizado, incluindo data de verificação.
+- Nenhuma aprovação de provider ocorrerá com base apenas na política geral do agregador OpenRouter.
+
+**Estado após esta seção:** Orçamento, ambiente e contas deixam de estar PENDENTES nos termos definidos acima. A verificação documental de retenção por endpoint/plano permanece como pré-requisito de execução (Seção 16) e será concluída caso a caso antes da primeira chamada paga a cada provider.

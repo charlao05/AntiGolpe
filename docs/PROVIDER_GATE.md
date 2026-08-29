@@ -460,3 +460,27 @@ Esta seção resolve os itens marcados como PENDENTE na Seção 19, conforme dec
 - Nenhuma aprovação de provider ocorrerá com base apenas na política geral do agregador OpenRouter.
 
 **Estado após esta seção:** Orçamento, ambiente e contas deixam de estar PENDENTES nos termos definidos acima. A verificação documental de retenção por endpoint/plano permanece como pré-requisito de execução (Seção 16) e será concluída caso a caso antes da primeira chamada paga a cada provider.
+
+
+### 20.5 Localização e política de acesso dos resultados (resolve item 6 de NOTES.md/EXECUTION.md)
+
+- Resultados brutos do experimento (respostas, métricas por caso) permanecem fora do repositório público, em backend/tests/provider_gate/results/, já coberto por .gitignore.
+- Acesso restrito à máquina local onde o harness for executado; nenhum upload de resultados brutos para serviços de terceiros ou artefatos de CI.
+- Somente um resumo agregado e minimizado (sem prompts/respostas completas, sem chaves, sem PII sintética reproduzida) poderá ser versionado em PROVIDER.md, conforme Seção 9 e Seção 17 deste contrato.
+- Nenhum resultado real será anexado a Pull Requests, issues ou comentários do GitHub.
+
+## 21. Auditoria do harness (dry-run) - 2026-08-29
+
+Auditoria realizada nesta data sobre backend/tests/provider_gate/ na branch phase5-provider-governance (PR #14, Draft), antes de qualquer execução real:
+
+- CI (GitHub Actions, run #52, commit 9a6b0c3): job backend-tests concluído com sucesso; passos executados foram apenas checkout, setup do Python, instalação de dependências, pytest (28 passed) e compilação dos módulos Python. Nenhuma chamada de rede, nenhum uso de secret/API key.
+- adapters.py: contém apenas um Protocol provider-neutro e um tipo ProviderResponse; nenhum SDK de provider real importado.
+- no_network.py: define explicitamente NETWORK_EXECUTION_ENABLED = False e REAL_PROVIDERS_ENABLED = False.
+- guard.py: expõe ExternalProviderNotAuthorized e unavailable_provider como trava explícita contra adapters reais.
+- requirements.txt: intencionalmente vazio; harness usa somente a stdlib do Python.
+- .gitignore local: exclui results/, *.jsonl, *.csv, *.json.
+- NOTES.md / EXECUTION.md: confirmam a mesma lista de 6 pendências de governança humana como bloqueio para qualquer adapter real.
+
+Conclusão da auditoria: o laboratório está em conformidade com os princípios não negociáveis da Seção 2. As pendências 1-4 e 6 foram formalizadas nas Seções 20.1-20.3 e 20.5. A pendência 5 (verificação documental da política de retenção por endpoint/plano exato de cada provider primário) continua aberta de fato - o compromisso de fazê-la está registrado na Seção 20.4, mas a verificação em si ainda precisa ser executada e documentada em PROVIDER.md antes da primeira chamada paga a qualquer provider.
+
+Nenhuma execução real de IA foi realizada, disparada ou autorizada durante esta auditoria.

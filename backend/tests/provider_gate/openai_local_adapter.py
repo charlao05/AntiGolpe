@@ -4,14 +4,12 @@ Safety rules enforced by this module:
 - This file is NEVER imported by backend/app, by CI workflows, or by the
   default pytest suite. It must be imported explicitly and manually by a
   human running the harness on their own machine.
+- The Provider Gate authorization is checked before the API key is read.
 - The API key is read only from the OPENAI_API_KEY environment variable.
   It is never hardcoded, never logged, never printed, and never included
   in any exception message.
-- No raw prompt or raw response is persisted to disk by this module. The
-  caller (runner) is responsible for writing only metadata/scores to
-  backend/tests/provider_gate/results/, which is gitignored.
-- A hard local spend ceiling is enforced (see MAX_TOTAL_USD / MAX_CALL_USD)
-  as required by docs/PROVIDER_GATE.md Section 20.1.
+- No raw prompt or raw response is persisted to disk by this module.
+- A hard local spend ceiling is enforced (see MAX_TOTAL_USD / MAX_CALL_USD).
 """
 from __future__ import annotations
 
@@ -20,9 +18,9 @@ import time
 from dataclasses import dataclass
 
 from .adapters import ProviderResponse
+from .guard import require_authorization
 
-# Hard local ceilings, mirroring docs/PROVIDER_GATE.md Section 20.1.
-MAX_TOTAL_USD = 3.00  # per-provider ceiling for this experiment
+MAX_TOTAL_USD = 3.00
 MAX_CALL_USD = 0.50
 
 
@@ -55,21 +53,14 @@ class SpendTracker:
 
 
 class OpenAIAdapter:
-    """Real OpenAI Chat Completions adapter. Local execution only.
-
-    Usage (from a local shell, never from CI):
-
-        export OPENAI_API_KEY=sk-...
-        python -c "
-        from backend.tests.provider_gate.openai_local_adapter import OpenAIAdapter
-        a = OpenAIAdapter(model='gpt-4o-mini')
-        print(a.analyze(system_prompt=None, user_input='ping'))
-        "
-    """
+    """Real OpenAI Chat Completions adapter. Local execution only."""
 
     name = "openai"
 
     def __init__(self, model: str = "gpt-4o-mini", spend_tracker: SpendTracker | None = None) -> None:
+        # Structural fail-closed point: direct construction is denied unless
+        # the explicit Provider Gate authorization is present.
+        require_authorization()
         self.model = model
         self._spend_tracker = spend_tracker or SpendTracker()
         self._api_key = os.environ.get("OPENAI_API_KEY")
@@ -80,18 +71,14 @@ class OpenAIAdapter:
             )
 
     def _client(self):
-        # Imported lazily so that importing this module never requires the
-        # openai package to be installed in environments that only run the
-        # dry-run suite (requirements.txt stays dependency-free by design).
         from openai import OpenAI
 
         return OpenAI(api_key=self._api_key)
 
     @staticmethod
     def _estimate_cost_usd(input_tokens: int, output_tokens: int) -> float:
-        # Conservative placeholder rates; replace with the exact published
-        # rate for the model/endpoint used before relying on this for
-        # anything beyond a local safety ceiling.
+        # Placeholder rates: verify against the exact published model/endpoint
+        # pricing before relying on this for accounting beyond the local cap.
         input_rate = 0.15 / 1_000_000
         output_rate = 0.60 / 1_000_000
         return input_tokens * input_rate + output_tokens * output_rate

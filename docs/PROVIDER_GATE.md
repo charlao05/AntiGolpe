@@ -484,3 +484,60 @@ Auditoria realizada nesta data sobre backend/tests/provider_gate/ na branch phas
 Conclusão da auditoria: o laboratório está em conformidade com os princípios não negociáveis da Seção 2. As pendências 1-4 e 6 foram formalizadas nas Seções 20.1-20.3 e 20.5. A pendência 5 (verificação documental da política de retenção por endpoint/plano exato de cada provider primário) continua aberta de fato - o compromisso de fazê-la está registrado na Seção 20.4, mas a verificação em si ainda precisa ser executada e documentada em PROVIDER.md antes da primeira chamada paga a qualquer provider.
 
 Nenhuma execução real de IA foi realizada, disparada ou autorizada durante esta auditoria.
+
+
+---
+
+## 22. Estado dos adapters locais (incorporado do addendum de 2026-08-30)
+
+Os adapters reais locais (como `openai_local_adapter.py`) coexistem com a infraestrutura provider-neutral. `adapters.py` continua sendo o contrato neutro; `openai_local_adapter.py` é um adapter real destinado exclusivamente à execução local explícita.
+
+O adapter real:
+
+- chama `require_authorization()` antes de ler `OPENAI_API_KEY`;
+- falha fechado sem `ANTIGOLPE_PROVIDER_GATE_AUTHORIZED=CONFIRMED`;
+- não é importado pelo runtime de produção nem pelo CI padrão;
+- limita a saída com `max_completion_tokens=800`;
+- executa uma estimativa conservadora de custo máximo antes da chamada (`assert_within_ceiling`), bloqueando antes de qualquer acesso à rede;
+- registra o custo efetivamente retornado depois da chamada (`register`) como circuit breaker para chamadas subsequentes.
+
+O `SpendTracker` não deve ser descrito como "hard cap de faturamento". O preflight local é uma barreira operacional baseada em estimativa conservadora (bytes UTF-8 como proxy de tokens de entrada); os limites e alertas de gasto configurados diretamente na conta do provider permanecem a camada independente e definitiva de proteção financeira.
+
+**Limitação conhecida e não resolvida:** o `runner.py` atual é exclusivamente um planejador dry-run (`plan_runs`), sem rede e sem SDK. Não existe ainda, em nenhum arquivo desta PR, um orquestrador que instancie um único `SpendTracker` compartilhado entre múltiplas chamadas/providers/fases. Cada `OpenAIAdapter()` cria seu próprio tracker por padrão. Portanto, o teto por-provider (US$3) e o teto global (US$10) da Seção 7.1 **não são hoje garantidos estruturalmente pelo código** durante uma execução real com múltiplas chamadas — dependem de um orquestrador ainda não escrito (ver Seção 24, escopo da PR #15).
+
+## 23. Protocolo de avaliação cega (incorporado do addendum de 2026-08-30)
+
+A identidade real do provider não deve ser revelada aos avaliadores antes da atribuição das notas (E1–E4).
+
+- O fluxo separa os resultados da execução (`execution_results.json`) da identidade do provider, utilizando um `mapping_key.json` isolado, mantido fora do repositório versionado.
+- `execution_results.json` não deve conter nomes de providers ou modelos, apenas identificadores neutros (ex.: `resp_A_001`).
+- Metadados que possam revelar a identidade do provider (formatação característica, headers, timestamps correlacionáveis) devem ser revisados antes da entrega aos avaliadores.
+- A chave de mapeamento (`mapping_key.json`) só é revelada após todas as notas E1–E4 estarem registradas para os três candidatos.
+
+## 24. Tabela de retenção e ZDR por provider (verificação documental — 2026-08-30)
+
+Esta tabela registra o estado documental público de cada provider candidato. Ela **não substitui** a confirmação contratual/comercial exigida antes de qualquer execução paga (Seção 20, pendências humanas 1-4). Fontes oficiais consultadas em 30/08/2026.
+
+| Provider | Endpoint/Plano | Retenção padrão (abuso) | Uso para treino por padrão | ZDR disponível | Como habilitar | Fonte |
+|---|---|---|---|---|---|---|
+| OpenAI | API (Chat Completions, gpt-4o-mini) | Até 30 dias para monitoramento de abuso | Não, para clientes de API (a menos que opt-in explícito) | Sim, para organizações elegíveis mediante aprovação | Contato com o time de vendas/sales da OpenAI; habilitação por organização e endpoint | developers.openai.com/api/docs/guides/your-data; openai.com/index/offering-zero-data-retention-for-frontier-models |
+| Anthropic | API (Messages, Claude Haiku) | 30 dias (reduzido a partir de 15/09/2025 para logs de API em geral, conforme fonte secundária) | Não, por padrão | Sim, mediante acordo contratual (ZDR Addendum) | Contato com o time comercial da Anthropic; habilitado por organização, não retroativo | platform.claude.com/docs/en/manage-claude/api-and-data-retention; privacy.claude.com/en/articles/7996866 |
+| Google | Gemini API paga (não Free Tier) | Até 55 dias para monitoramento de abuso | Não, no tier pago da API | Sim, via Vertex AI para clientes enterprise elegíveis (termos contratuais) | Contato com Google Cloud sales/account team; aplicável a Vertex AI, não confirmado para Gemini API direta | anarlog.so/blog/google-gemini-data-retention-policy; docs.cloud.google.com/gemini-enterprise-agent-platform/resources/zero-data-retention |
+
+**Nota crítica de governança:** o Google AI Studio / Gemini Free Tier usa conteúdo submetido para melhorar produtos e pode ter revisão humana — **não deve ser usado com dados reais de usuários em nenhuma hipótese**, apenas com dados sintéticos, se usado. A elegibilidade real de ZDR para a conta específica deste projeto ainda não foi verificada com nenhum dos três providers; esta tabela é um ponto de partida documental, não uma confirmação de habilitação.
+
+## 25. Escopo planejado para PR #15 (orquestrador de execução real — NÃO incluído nesta PR)
+
+Esta seção registra o escopo pretendido para uma PR futura e separada, que só deve ser aberta após a aprovação e merge desta PR #14. Nenhum código deste escopo foi implementado ainda.
+
+A PR #15 deve conter:
+
+1. Um orquestrador que instancie **um único `SpendTracker`** por execução completa e o injete explicitamente em todas as instâncias de adapter usadas (todas as chamadas, todas as fases, todos os providers), garantindo que o teto global de US$10 (Seção 7.1) seja respeitado de fato, não apenas por convenção.
+2. Adapters reais para os providers efetivamente aprovados após verificação de ZDR (Seção 24).
+3. Leitura de credenciais exclusivamente via variáveis de ambiente locais (`.env` não versionado), nunca em logs, nunca em mensagens de erro, nunca no repositório.
+4. Prompts e schemas finais para as três fases (Puro, Framework, Framework+Structured Output) congelados no contrato antes da execução.
+5. Captura sistemática de tokens (input/output), latência e custo por chamada, persistidos localmente em `results/` (já coberto por `.gitignore`).
+6. Mecanismo determinístico de parada em caso de falhas D1-D5 (critérios de eliminação já definidos na Seção correspondente do contrato).
+7. Sequência de execução em fases crescentes: 1 chamada de teste → dry-run de 3 chamadas (1 por provider) → execução completa de 270 chamadas (90 por provider/modo) com avaliação cega D1-D6 e E1-E4.
+
+Enquanto a PR #15 não existir e não for aprovada, nenhuma execução real com múltiplas chamadas encadeadas deve ocorrer, mesmo que `CONFIRMED` seja ativado manualmente para um teste isolado de 1 chamada.

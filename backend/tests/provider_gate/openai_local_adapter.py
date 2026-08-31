@@ -1,31 +1,38 @@
-"""Real OpenAI adapter for the Provider Gate LOCAL dry run.
+"""Real OpenAI adapter for the Provider Gate LOCAL experiment.
 
 Safety rules enforced by this module:
 - This file is NEVER imported by backend/app, by CI workflows, or by the
-  default pytest suite. It must be imported explicitly and manually by a
-  human running the harness on their own machine.
-- The Provider Gate authorization is checked before the API key is read.
-- The API key is read only from the OPENAI_API_KEY environment variable.
-  It is never hardcoded, never logged, never printed, and never included
-  in any exception message.
-- No raw prompt or raw response is persisted to disk by this module.
-- A hard local spend ceiling is enforced (see MAX_TOTAL_USD / MAX_CALL_USD).
+  default production runtime. It is intended for explicit local execution only.
+- Provider Gate authorization is checked before the API key is read.
+- The API key is read only from OPENAI_API_KEY and is never logged or persisted.
+- No raw prompt or raw response is persisted by this module.
+- A conservative pre-call spend check combines a fixed output-token ceiling
+  with an upper-bound input-token estimate. The tracker also records actual
+  post-call usage and acts as a circuit breaker for subsequent calls.
+
+The provider account's own billing controls remain an independent safety layer.
+The local pre-call estimate is a guard, not a substitute for provider billing
+limits or final invoice accounting.
 """
 from __future__ import annotations
 
 import os
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from .adapters import ProviderResponse
 from .guard import require_authorization
 
 MAX_TOTAL_USD = 3.00
 MAX_CALL_USD = 0.50
+MAX_OUTPUT_TOKENS = 800
+INPUT_USD_PER_MILLION = 0.15
+OUTPUT_USD_PER_MILLION = 0.60
 
 
 class SpendCeilingExceeded(RuntimeError):
-    """Raised when the local spend ceiling would be exceeded."""
+    """Raised when a local spend ceiling would be exceeded."""
 
 
 class MissingApiKey(RuntimeError):
@@ -34,22 +41,32 @@ class MissingApiKey(RuntimeError):
 
 @dataclass
 class SpendTracker:
-    """In-memory only. Never persisted, never logged."""
+    """In-memory spend accounting; never persisted or logged."""
 
     total_usd: float = 0.0
 
-    def register(self, call_usd: float) -> None:
-        if call_usd > MAX_CALL_USD:
+    def assert_within_ceiling(self, worst_case_call_usd: float) -> None:
+        """Reject a call before network access when its worst case is too high."""
+        if worst_case_call_usd > MAX_CALL_USD:
             raise SpendCeilingExceeded(
-                f"Single call estimated at ${call_usd:.4f} exceeds per-call ceiling "
-                f"of ${MAX_CALL_USD:.2f}."
+                f"Worst-case call estimate ${worst_case_call_usd:.4f} exceeds "
+                f"the ${MAX_CALL_USD:.2f} per-call ceiling."
             )
-        if self.total_usd + call_usd > MAX_TOTAL_USD:
+        if self.total_usd + worst_case_call_usd > MAX_TOTAL_USD:
             raise SpendCeilingExceeded(
-                f"Running total ${self.total_usd:.4f} + ${call_usd:.4f} would exceed "
-                f"the ${MAX_TOTAL_USD:.2f} ceiling for this provider."
+                f"Running total ${self.total_usd:.4f} plus worst-case call "
+                f"${worst_case_call_usd:.4f} would exceed the ${MAX_TOTAL_USD:.2f} "
+                "provider ceiling."
             )
-        self.total_usd += call_usd
+
+    def register(self, actual_call_usd: float) -> None:
+        """Record actual usage returned by the provider after a completed call."""
+        self.total_usd += actual_call_usd
+        if self.total_usd > MAX_TOTAL_USD:
+            raise SpendCeilingExceeded(
+                f"Recorded spend ${self.total_usd:.4f} exceeded the "
+                f"${MAX_TOTAL_USD:.2f} provider ceiling."
+            )
 
 
 class OpenAIAdapter:
@@ -57,9 +74,13 @@ class OpenAIAdapter:
 
     name = "openai"
 
-    def __init__(self, model: str = "gpt-4o-mini", spend_tracker: SpendTracker | None = None) -> None:
-        # Structural fail-closed point: direct construction is denied unless
-        # the explicit Provider Gate authorization is present.
+    def __init__(
+        self,
+        model: str = "gpt-4o-mini",
+        spend_tracker: SpendTracker | None = None,
+    ) -> None:
+        # Structural fail-closed point: authorization is checked before any
+        # attempt to read the API key.
         require_authorization()
         self.model = model
         self._spend_tracker = spend_tracker or SpendTracker()
@@ -77,27 +98,53 @@ class OpenAIAdapter:
 
     @staticmethod
     def _estimate_cost_usd(input_tokens: int, output_tokens: int) -> float:
-        # Placeholder rates: verify against the exact published model/endpoint
-        # pricing before relying on this for accounting beyond the local cap.
-        input_rate = 0.15 / 1_000_000
-        output_rate = 0.60 / 1_000_000
-        return input_tokens * input_rate + output_tokens * output_rate
+        return (
+            input_tokens * INPUT_USD_PER_MILLION / 1_000_000
+            + output_tokens * OUTPUT_USD_PER_MILLION / 1_000_000
+        )
+
+    @staticmethod
+    def _conservative_input_token_estimate(messages: list[dict[str, str]]) -> int:
+        """Conservative local estimate used only for the pre-call budget guard.
+
+        UTF-8 byte length is intentionally used as an upper-bound-oriented
+        approximation for this fixed synthetic benchmark. It is not a billing
+        tokenizer and must not be used as final accounting.
+        """
+        content_bytes = sum(
+            len(message.get("content", "").encode("utf-8")) for message in messages
+        )
+        message_overhead = 64 * len(messages)
+        return content_bytes + message_overhead
+
+    def _preflight_spend(self, messages: list[dict[str, str]]) -> None:
+        estimated_input_tokens = self._conservative_input_token_estimate(messages)
+        worst_case_cost = self._estimate_cost_usd(
+            estimated_input_tokens,
+            MAX_OUTPUT_TOKENS,
+        )
+        self._spend_tracker.assert_within_ceiling(worst_case_cost)
 
     def analyze(self, *, system_prompt: str | None, user_input: str) -> ProviderResponse:
-        client = self._client()
-        messages = []
+        messages: list[dict[str, str]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": user_input})
+
+        # Budget check happens before client creation and before network access.
+        self._preflight_spend(messages)
+        client = self._client()
 
         start = time.monotonic()
         response = client.chat.completions.create(
             model=self.model,
             messages=messages,
+            max_completion_tokens=MAX_OUTPUT_TOKENS,
+            temperature=0.0,
         )
         latency_ms = (time.monotonic() - start) * 1000
 
-        usage = getattr(response, "usage", None)
+        usage: Any = getattr(response, "usage", None)
         input_tokens = getattr(usage, "prompt_tokens", None) if usage else None
         output_tokens = getattr(usage, "completion_tokens", None) if usage else None
 

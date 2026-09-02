@@ -541,3 +541,40 @@ A PR #15 deve conter:
 7. Sequência de execução em fases crescentes: 1 chamada de teste → dry-run de 3 chamadas (1 por provider) → execução completa de 270 chamadas (90 por provider/modo) com avaliação cega D1-D6 e E1-E4.
 
 Enquanto a PR #15 não existir e não for aprovada, nenhuma execução real com múltiplas chamadas encadeadas deve ocorrer, mesmo que `CONFIRMED` seja ativado manualmente para um teste isolado de 1 chamada.
+
+
+---
+
+## 26. Errata e correções — 2026-09-02
+
+Esta seção corrige e substitui pontos específicos das Seções 24 e 25, registrados anteriormente, com base em nova verificação de fontes oficiais e no estado real do repositório nesta data.
+
+### 26.1. Correção de nomenclatura (Seção 25)
+
+A referência a "PR #15" nas Seções 20.6/25 como identificador do futuro executor real está **incorreta e revogada**. A PR #15 real e existente no repositório é uma PR automática do Dependabot (`chore(deps): bump github/codeql-action from 3 to 4`), sem qualquer relação com o executor de experimentos. O futuro orquestrador de execução real não deve ser referenciado por número de PR até que essa PR seja de fato aberta. Nome de branch sugerido para quando isso ocorrer: `phase5-provider-executor`.
+
+### 26.2. Correção da Seção 24 — Tabela de retenção/ZDR (fontes oficiais primárias, sem referências secundárias)
+
+A versão anterior da Seção 24 continha fontes secundárias (blogs de terceiros) para Anthropic e Google, o que viola o requisito do próprio contrato de usar apenas documentação oficial. Além disso, "Google" não especificava se a política se referia à Gemini Developer API ou à Vertex AI — são produtos com políticas de dados distintas. Esta tabela substitui integralmente a da Seção 24:
+
+| Provider | Produto/Endpoint exato | Retenção padrão (abuso) | Uso para treino por padrão | ZDR disponível | Fonte oficial primária |
+|---|---|---|---|---|---|
+| OpenAI | API / Chat Completions / gpt-4o-mini | Até 30 dias para monitoramento de abuso, conforme controles de retenção da plataforma | Não, para uso via API, por padrão | Sim, mediante elegibilidade e aprovação | platform.openai.com/docs/models/default-usage-policies-by-endpoint |
+| Anthropic | Claude API / Messages / modelo Haiku a definir | Conforme política de retenção da API descrita na documentação oficial da plataforma | Não, por padrão | Sim, mediante elegibilidade e acordo (ZDR) | platform.claude.com/docs/en/manage-claude/api-and-data-retention |
+| Google — opção A | Gemini Developer API | Retenção de registros de monitoramento de abuso conforme política oficial vigente (verificar valor exato na fonte antes da aprovação) | Não, para uso via API paga, por padrão | Documentação própria de ZDR disponível para este produto | ai.google.dev/gemini-api/docs/usage-policies |
+| Google — opção B | Vertex AI (Generative AI) | Política de retenção própria, distinta da Gemini Developer API | Não, por padrão | Sim, com política dedicada de zero data retention | docs.cloud.google.com/vertex-ai/generative-ai/docs/vertex-ai-zero-data-retention |
+
+**Decisão pendente adicionada:** antes de aprovar qualquer execução real com um provider Google, é necessário decidir explicitamente entre Gemini Developer API e Vertex AI, pois são políticas de retenção/ZDR diferentes. Esta decisão não foi tomada e permanece uma pendência humana (ver Seção 20).
+
+**Esta tabela ainda não está "selada"**: os valores exatos de retenção devem ser reconferidos diretamente nas páginas oficiais linkadas acima imediatamente antes de qualquer aprovação de execução paga, pois políticas de provedores de IA mudam com frequência.
+
+### 26.3. CodeQL — estado honesto, sem maquiagem
+
+O GitHub Code Security/Advanced Security não está habilitado neste repositório privado. Por isso, o job CodeQL das PRs falha no passo final de análise/publicação (upload de SARIF é rejeitado), mesmo quando a inicialização e a análise em si são concluídas. Isso está documentado oficialmente como comportamento esperado para repositórios sem GitHub Code Security habilitado.
+
+**Decisão de governança adotada nesta data:** não habilitar GitHub Advanced Security nesta fase, para não incorrer em custo. Consequentemente:
+
+- CodeQL **não é** utilizado como gate de aprovação desta fase do Provider Gate.
+- Isso **não deve ser confundido ou relatado como "CodeQL passou" ou "CodeQL verde"** em nenhuma auditoria futura. O status real e correto a ser reportado é: "CodeQL indisponível neste plano do repositório; não avaliado como gate."
+- A cobertura de segurança nesta fase depende de: (a) testes automatizados dedicados (`test_openai_local_adapter.py`, `test_network_guard.py`, etc.), (b) revisão manual de diff a cada PR, e (c) os testes do `AntiGolpe CI`, que permanecem obrigatórios e verdes.
+- Se, no futuro, o orçamento permitir, o GitHub Advanced Security poderá ser habilitado e o CodeQL reintroduzido como gate formal.

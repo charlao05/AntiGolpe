@@ -1,0 +1,1 @@
+Provider Gate dry-run scaffold prepared. Real provider calls remain disabled pending governance approval.

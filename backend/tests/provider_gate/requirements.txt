@@ -1,0 +1,9 @@
+# Intentionally empty: the dry-run Provider Gate uses only Python stdlib.
+# Real provider SDKs require a separately approved experiment and must not be added here prematurely.
+
+
+# Optional, LOCAL-ONLY dependency for openai_local_adapter.py.
+# Never installed automatically by CI (see requirements-ci.txt / pyproject).
+# Install manually before running the local manual test:
+#   pip install openai>=1.0
+openai>=1.0

@@ -6,9 +6,11 @@ import pytest
 
 from backend.tests.provider_gate.adapters import ProviderResponse
 from backend.tests.provider_gate.execution_orchestrator import ExecutionHalted, ExecutionOrchestrator
+from backend.tests.provider_gate.guard import ExternalProviderNotAuthorized
 from backend.tests.provider_gate.spend_tracker import (
     ConfigurationError,
     ExecutionState,
+    InvalidUsage,
     SpendTracker,
 )
 
@@ -33,7 +35,7 @@ class FakeAdapter:
 
     def calculate_real_cost(self, response: ProviderResponse) -> float:
         if response.input_tokens is None or response.output_tokens is None:
-            raise RuntimeError("usage missing")
+            raise InvalidUsage("usage missing")
         return (response.input_tokens + response.output_tokens) / 100_000
 
 
@@ -129,14 +131,16 @@ def test_budget_preflight_happens_before_adapter_call():
 def test_provider_gate_failure_is_pre_network_and_records_no_spend():
     adapter = FakeAdapter()
     incidents = RecordingIncidents()
+
+    def denied() -> None:
+        raise ExternalProviderNotAuthorized("blocked")
+
     orch = ExecutionOrchestrator(
         providers={"fake": adapter},
         spend_tracker=tracker(),
         safety_authority=FakeSafety(),
         incident_recorder=incidents,
-        authorization_check=lambda: (_ for _ in ()).throw(
-            __import__("backend.tests.provider_gate.guard", fromlist=["ExternalProviderNotAuthorized"]).ExternalProviderNotAuthorized("blocked")
-        ),
+        authorization_check=denied,
     )
     with pytest.raises(ExecutionHalted) as exc:
         orch.execute_one(provider="fake", system_prompt=None, user_input="x")
@@ -197,7 +201,7 @@ def test_missing_usage_is_provider_failure_and_never_zero():
         orch.execute_one(provider="fake", system_prompt=None, user_input="x")
     assert exc.value.state is ExecutionState.PROVIDER_FAILURE
     assert orch.spend_tracker.global_spend == 0
-    assert incidents.items[0][1] == "RuntimeError"
+    assert incidents.items[0][1] == "InvalidUsage"
 
 
 def test_security_failure_overrides_budget_terminal_state():

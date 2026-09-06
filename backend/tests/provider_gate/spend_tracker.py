@@ -79,6 +79,18 @@ class SpendLimits:
 class SpendTracker:
     """Single global financial authority for a serial experiment."""
 
+    _IMMUTABLE_FIELDS: Final[frozenset[str]] = frozenset(
+        {
+            "_limits",
+            "limits",
+            "_global_spend",
+            "_provider_spend",
+            "_call_count",
+            "_provider_call_count",
+            "_state",
+        }
+    )
+
     def __init__(self, *, global_ceiling: float, provider_ceiling: float, per_call_ceiling: float) -> None:
         object.__setattr__(self, "_limits", SpendLimits(global_ceiling, provider_ceiling, per_call_ceiling))
         object.__setattr__(self, "_global_spend", 0.0)
@@ -90,14 +102,7 @@ class SpendTracker:
 
     def __setattr__(self, name: str, value: object) -> None:
         """Prevent external mutation of financial authority state."""
-        if getattr(self, "_initialized", False) and name in {
-            "_limits",
-            "_global_spend",
-            "_provider_spend",
-            "_call_count",
-            "_provider_call_count",
-            "_state",
-        }:
+        if getattr(self, "_initialized", False) and name in self._IMMUTABLE_FIELDS:
             raise ConfigurationError(f"SpendTracker field '{name}' is immutable from outside the authority")
         object.__setattr__(self, name, value)
 
@@ -127,8 +132,6 @@ class SpendTracker:
 
     @state.setter
     def state(self, value: ExecutionState) -> None:
-        # State transitions are owned by the tracker methods below; this setter
-        # exists only for internal method compatibility and rejects external use.
         if getattr(self, "_internal_state_write", False):
             object.__setattr__(self, "_state", value)
             return
@@ -204,8 +207,6 @@ class SpendTracker:
         new_global = self._global_spend + real_cost
         new_provider = self._provider_spend.get(provider, 0.0) + real_cost
 
-        # Account the real cost before halting if a provider's actual usage
-        # invalidates a preventive estimate. A known cost is never discarded.
         object.__setattr__(self, "_global_spend", new_global)
         self._provider_spend[provider] = new_provider
         object.__setattr__(self, "_call_count", self._call_count + 1)

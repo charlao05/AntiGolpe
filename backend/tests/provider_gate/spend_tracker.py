@@ -84,10 +84,15 @@ class SpendTracker:
             "_limits",
             "limits",
             "_global_spend",
+            "global_spend",
             "_provider_spend",
+            "provider_spend",
             "_call_count",
+            "call_count",
             "_provider_call_count",
+            "provider_call_count",
             "_state",
+            "state",
         }
     )
 

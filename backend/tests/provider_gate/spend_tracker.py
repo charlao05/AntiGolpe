@@ -168,7 +168,13 @@ class SpendTracker:
         self.state = ExecutionState.COMPLETED
 
     def abort_security(self) -> None:
-        """Apply the non-bypassable D1-D5 global stop."""
+        """Apply the non-bypassable D1-D5 global stop with absolute precedence."""
+        # Security outranks budget. The only terminal state deliberately
+        # superseded here is SPEND_LIMIT_REACHED; all other terminal states
+        # remain irreversible as required by the contract.
+        if self.state == ExecutionState.SPEND_LIMIT_REACHED:
+            self.state = ExecutionState.SECURITY_ABORT
+            return
         if self.is_terminal:
             return
         self.state = ExecutionState.SECURITY_ABORT

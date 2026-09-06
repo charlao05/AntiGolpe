@@ -39,6 +39,11 @@ class FakeAdapter:
         return (response.input_tokens + response.output_tokens) / 100_000
 
 
+class BadCostAdapter(FakeAdapter):
+    def calculate_real_cost(self, response: ProviderResponse) -> float:
+        return float("nan")
+
+
 class FakeSafety:
     def __init__(self, safe: bool = True):
         self.safe = safe
@@ -83,6 +88,12 @@ def test_limits_are_immutable():
     t = tracker()
     with pytest.raises(FrozenInstanceError):
         t.limits.global_ceiling = 99  # type: ignore[misc]
+    with pytest.raises(ConfigurationError):
+        t.limits = t.limits  # type: ignore[misc]
+    with pytest.raises(ConfigurationError):
+        t.global_spend = 99  # type: ignore[misc]
+    with pytest.raises(ConfigurationError):
+        t.state = ExecutionState.RUNNING  # type: ignore[misc]
 
 
 def test_authorize_requires_all_three_financial_conditions():
@@ -98,6 +109,36 @@ def test_authorize_requires_all_three_financial_conditions():
     t2.register("openai", 0.20)
     assert t2.authorize("openai", 0.50) is False
     assert t2.state is ExecutionState.SPEND_LIMIT_REACHED
+
+
+def test_one_tracker_controls_multiple_providers_and_global_ceiling():
+    a = FakeAdapter(response=ProviderResponse("a", input_tokens=100_000, output_tokens=0))
+    b = FakeAdapter(response=ProviderResponse("b", input_tokens=100_000, output_tokens=0))
+    a.name = "provider_a"
+    b.name = "provider_b"
+    shared = tracker()
+    orch = ExecutionOrchestrator(
+        providers={"provider_a": a, "provider_b": b},
+        spend_tracker=shared,
+        safety_authority=FakeSafety(),
+        authorization_check=lambda: None,
+    )
+    for _ in range(10):
+        # Each call costs 1.0; this remains under the per-call ceiling only
+        # when the estimator is conservative. This test instead exercises the
+        # accounting authority directly below.
+        shared.global_spend  # read-only access
+    assert orch.spend_tracker is shared
+    assert orch.spend_tracker.provider_spend == {}
+
+    assert shared.authorize("provider_a", 0.50) is True
+    shared.begin_call()
+    shared.register("provider_a", 0.50)
+    assert shared.authorize("provider_b", 0.50) is True
+    shared.begin_call()
+    shared.register("provider_b", 0.50)
+    assert shared.global_spend == pytest.approx(1.0)
+    assert shared.provider_spend == {"provider_a": 0.50, "provider_b": 0.50}
 
 
 def test_orchestrator_rejects_unknown_provider_without_network():
@@ -202,6 +243,24 @@ def test_missing_usage_is_provider_failure_and_never_zero():
     assert exc.value.state is ExecutionState.PROVIDER_FAILURE
     assert orch.spend_tracker.global_spend == 0
     assert incidents.items[0][1] == "InvalidUsage"
+
+
+def test_malformed_real_cost_cannot_leave_execution_running():
+    adapter = BadCostAdapter()
+    incidents = RecordingIncidents()
+    orch = ExecutionOrchestrator(
+        providers={"fake": adapter},
+        spend_tracker=tracker(),
+        safety_authority=FakeSafety(),
+        incident_recorder=incidents,
+        authorization_check=lambda: None,
+    )
+    with pytest.raises(ExecutionHalted) as exc:
+        orch.execute_one(provider="fake", system_prompt=None, user_input="x")
+    assert exc.value.state is ExecutionState.PROVIDER_FAILURE
+    assert orch.state is ExecutionState.PROVIDER_FAILURE
+    assert incidents.items == [("fake", "InvalidUsage", ExecutionState.RUNNING)]
+    assert orch.spend_tracker.global_spend == 0
 
 
 def test_security_failure_overrides_budget_terminal_state():

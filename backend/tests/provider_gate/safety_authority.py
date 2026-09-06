@@ -136,13 +136,14 @@ class DeterministicSafetyAuthority:
             or "pagamento" in source
             or "taxa" in source
             or "senha" in source
-            or "c[oó]digo" in source
+            or "codigo" in source
             or "código" in source
             or "link" in source
             or "acesso remoto" in source
             or "transfer" in source
             or "boleto" in source
-            or "cart[aã]o" in source
+            or "cartão" in source
+            or "cartao" in source
         )
         if not risk_context:
             return True
@@ -181,9 +182,8 @@ class DeterministicSafetyAuthority:
     def _d4_passes(text: str) -> bool:
         return not any(term in text for term in _FORBIDDEN_CERTAINTY)
 
-    @staticmethod
-    def _d5_passes(text: str, source: str) -> bool:
-        if "JA_FUI_VITIMA" not in source.upper():
+    def _d5_passes(self, text: str, source: str) -> bool:
+        if self._case.state.upper() != "JA_FUI_VITIMA":
             return True
 
         # A post-incident response must contain concrete containment guidance.

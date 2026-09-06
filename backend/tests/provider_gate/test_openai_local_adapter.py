@@ -3,7 +3,11 @@ import os
 import pytest
 
 from backend.tests.provider_gate.guard import ExternalProviderNotAuthorized
-from backend.tests.provider_gate.openai_local_adapter import MissingApiKey, OpenAIAdapter
+from backend.tests.provider_gate.openai_local_adapter import (
+    MissingApiKey,
+    OpenAIAdapter,
+    PricingConfigurationError,
+)
 
 
 def test_adapter_fails_closed_without_confirmed_even_with_api_key(monkeypatch):
@@ -59,6 +63,5 @@ def test_adapter_rejects_unknown_model_pricing(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-fake-key-for-testing")
 
     adapter = OpenAIAdapter(model="unapproved-model")
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(PricingConfigurationError, match="pricing mapping"):
         adapter.estimate_worst_case_cost(system_prompt=None, user_input="hello")
-    assert "pricing mapping" in str(exc.value)

@@ -1,7 +1,8 @@
-"""Provider adapter interfaces for the sandbox.
+"""Provider-neutral interfaces for the Provider Gate experiment.
 
-Real adapters are intentionally unavailable until the Provider Gate governance
-contract is fully approved. This file contains only a provider-neutral protocol.
+Real provider adapters remain local-only and explicitly gated. The adapter
+contract exposes provider-specific cost estimation and real-cost extraction;
+financial authorization and accounting remain exclusively in SpendTracker.
 """
 from __future__ import annotations
 
@@ -20,11 +21,16 @@ class ProviderResponse:
 class ProviderAdapter(Protocol):
     name: str
 
-    def analyze(self, *, system_prompt: str | None, user_input: str) -> ProviderResponse:
-        """Execute one provider call.
+    def estimate_worst_case_cost(self, *, system_prompt: str | None, user_input: str) -> float:
+        """Return the provider-specific worst-case cost estimate for one call."""
+        ...
 
-        Real implementations are intentionally not supplied in this phase.
-        """
+    def analyze(self, *, system_prompt: str | None, user_input: str) -> ProviderResponse:
+        """Execute exactly one provider call after external authorization."""
+        ...
+
+    def calculate_real_cost(self, response: ProviderResponse) -> float:
+        """Extract the definitive real cost from provider-reported usage."""
         ...
 
 

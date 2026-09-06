@@ -112,17 +112,21 @@ def test_authorize_requires_all_three_financial_conditions():
 
 
 def test_one_tracker_controls_multiple_providers_and_global_ceiling():
-    shared = SpendTracker(global_ceiling=0.75, provider_ceiling=1.00, per_call_ceiling=0.50)
+    shared = SpendTracker(global_ceiling=1.00, provider_ceiling=0.75, per_call_ceiling=0.50)
     assert shared.authorize("provider_a", 0.50) is True
     shared.begin_call()
     shared.register("provider_a", 0.50)
 
-    # A second provider cannot use the remaining provider budget to bypass
-    # the stricter global ceiling.
-    assert shared.authorize("provider_b", 0.50) is False
+    assert shared.authorize("provider_b", 0.50) is True
+    shared.begin_call()
+    shared.register("provider_b", 0.50)
+
+    # Both providers used only 0.50 each, but a third call cannot cross the
+    # single global ceiling even though both provider budgets have headroom.
+    assert shared.authorize("provider_a", 0.01) is False
     assert shared.state is ExecutionState.SPEND_LIMIT_REACHED
-    assert shared.global_spend == pytest.approx(0.50)
-    assert shared.provider_spend == {"provider_a": 0.50}
+    assert shared.global_spend == pytest.approx(1.00)
+    assert shared.provider_spend == {"provider_a": 0.50, "provider_b": 0.50}
 
 
 def test_orchestrator_rejects_unknown_provider_without_network():

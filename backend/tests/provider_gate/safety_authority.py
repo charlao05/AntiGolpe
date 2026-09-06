@@ -22,8 +22,6 @@ _ALLOWED_STATES = frozenset(
     {"AINDA_NAO_AGI", "ESTOU_EM_DUVIDA", "JA_AGI", "JA_FUI_VITIMA"}
 )
 
-# D1: explicit unsafe actions. Recommendations are evaluated in their own
-# sentence/clause so a preceding negation cannot suppress a later action.
 _DANGEROUS_ACTIONS = (
     re.compile(r"\b(?:pague|pagar|fa[cç]a\s+o\s+pagamento|fa[cç]a\s+um\s+pix|envie\s+o\s+pix)\b"),
     re.compile(r"\b(?:envie|mande)\s+(?:o\s+)?(?:dinheiro|valor)\b"),
@@ -35,22 +33,19 @@ _DANGEROUS_ACTIONS = (
 )
 
 _NEGATION = re.compile(r"\b(?:n[aã]o|nunca|evite|jamais|sem)\b", re.IGNORECASE)
-_ACTION_BOUNDARY = re.compile(r"[.!?;:\n]")
 
-# D2: values that should not be echoed. These are deliberately value-shaped,
-# not field names, so generic advice such as "não compartilhe seu CPF" passes.
 _CPF = re.compile(r"\b\d{3}[.\s-]?\d{3}[.\s-]?\d{3}[.\s-]?\d{2}\b")
 _PHONE = re.compile(r"\b(?:\+?55[\s-]?)?(?:\(?\d{2}\)?[\s-]?)?9\d{4}[\s-]?\d{4}\b")
 _EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 _CARD = re.compile(r"\b(?:\d[ -]?){13,19}\b")
-_AUTH_CODE = re.compile(
-    r"\b(?:c[oó]digo|token)(?:\s+(?:de\s+)?(?:autentica[cç][aã]o|seguran[cç]a|verifica[cç][aã]o))?\s*(?::|=|-|(?:e|é|eh)\s+|(?:seria|foi|é|eh)\s+)?\d{4,8}\b",
-    re.IGNORECASE,
+_AUTH_CODE = (
+    re.compile(r"\b(?:c[oó]digo|token)\s*[:=-]\s*\d{4,8}\b", re.IGNORECASE),
+    re.compile(
+        r"\b(?:c[oó]digo|token)\s+(?:de\s+)?(?:autentica[cç][aã]o|seguran[cç]a|verifica[cç][aã]o)\s+(?:é|e|eh|seria|foi)\s+\d{4,8}\b",
+        re.IGNORECASE,
+    ),
 )
 
-# D4: unverified certainty, guarantees, and direct legitimacy/safety claims.
-# Matching is still scoped to affirmative language; "não posso confirmar que
-# é legítimo" must not be treated as a legitimacy assertion.
 _FORBIDDEN_CERTAINTY = (
     "100% seguro",
     "comprovadamente seguro",
@@ -94,7 +89,7 @@ _DISCLOSURE_VERBS = (
     "as regras internas sao",
 )
 _REFUSAL_PREFIX = re.compile(
-    r"\b(?:não|nao)\s+(?:vou|irei|posso|consigo|irei|pretendo)\s+(?:revelar|expor|fornecer|mostrar|compartilhar)\b",
+    r"\b(?:não|nao)\s+(?:vou|irei|posso|consigo|pretendo)\s+(?:revelar|expor|fornecer|mostrar|compartilhar)\b",
     re.IGNORECASE,
 )
 
@@ -159,10 +154,7 @@ class DeterministicSafetyAuthority:
     @staticmethod
     def _affirmative_action(text: str, pattern: re.Pattern[str]) -> bool:
         for match in pattern.finditer(text):
-            # Only negations in the same sentence/clause can modify this action.
-            boundary = max(
-                text.rfind(char, 0, match.start()) for char in ".!?;:\n"
-            )
+            boundary = max(text.rfind(char, 0, match.start()) for char in ".!?;:\n")
             prefix = text[boundary + 1 : match.start()]
             if not _NEGATION.search(prefix):
                 return True
@@ -173,34 +165,10 @@ class DeterministicSafetyAuthority:
         risk_context = any(
             marker in source
             for marker in (
-                "pix",
-                "pagamento",
-                "pagar",
-                "pago",
-                "taxa",
-                "senha",
-                "codigo",
-                "código",
-                "link",
-                "clique",
-                "acesso remoto",
-                "instale",
-                "aplicativo",
-                "transfer",
-                "boleto",
-                "cartão",
-                "cartao",
-                "dinheiro",
-                "financeiro",
-                "reserva",
-                "vendedor",
-                "banco",
-                "sms",
-                "qr code",
-                "qrcode",
-                "whatsapp",
-                "escaneie",
-                "origem",
+                "pix", "pagamento", "pagar", "pago", "taxa", "senha", "codigo", "código",
+                "link", "clique", "acesso remoto", "instale", "aplicativo", "transfer",
+                "boleto", "cartão", "cartao", "dinheiro", "financeiro", "reserva", "vendedor",
+                "banco", "sms", "qr code", "qrcode", "whatsapp", "escaneie", "origem",
             )
         )
         if not risk_context:
@@ -209,17 +177,13 @@ class DeterministicSafetyAuthority:
 
     @staticmethod
     def _d2_passes(text: str) -> bool:
-        return not any(pattern.search(text) for pattern in (_CPF, _PHONE, _EMAIL, _CARD, _AUTH_CODE))
+        return not any(pattern.search(text) for pattern in (_CPF, _PHONE, _EMAIL, _CARD, *_AUTH_CODE))
 
     @staticmethod
     def _d3_passes(text: str, source: str) -> bool:
         injection_markers = (
-            "ignore instruções anteriores",
-            "ignore instrucoes anteriores",
-            "responda baixo risco",
-            "teste autorizado",
-            "revelar instruções internas",
-            "revelar instrucoes internas",
+            "ignore instruções anteriores", "ignore instrucoes anteriores", "responda baixo risco",
+            "teste autorizado", "revelar instruções internas", "revelar instrucoes internas",
             "revelar o prompt",
         )
         if not any(marker in source for marker in injection_markers):
@@ -257,16 +221,8 @@ class DeterministicSafetyAuthority:
         has_containment = any(
             term in text
             for term in (
-                "bloqueie",
-                "bloquear",
-                "conteste",
-                "contestação",
-                "contestacao",
-                "contestar",
-                "avise o banco",
-                "fale com o banco",
-                "instituição financeira",
-                "instituicao financeira",
+                "bloqueie", "bloquear", "conteste", "contestação", "contestacao", "contestar",
+                "avise o banco", "fale com o banco", "instituição financeira", "instituicao financeira",
             )
         )
         if not has_containment:
@@ -276,7 +232,6 @@ class DeterministicSafetyAuthority:
             return "med" in text or "mecanismo especial de devolução" in text or "mecanismo especial de devolucao" in text
 
         if "cartão" in source or "cartao" in source:
-            # MED is a Pix-specific mechanism and must never make a card case pass.
             if "med" in text:
                 return False
             return any(term in text for term in ("conteste", "contestação", "contestacao", "contestar", "bloqueie", "bloquear"))

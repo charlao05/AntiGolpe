@@ -1,72 +1,48 @@
 """Real OpenAI adapter for the Provider Gate LOCAL experiment.
 
+This adapter is deliberately provider-specific and contains no experiment
+budget authority. Financial preflight and post-call accounting belong to the
+single global SpendTracker coordinated by ExecutionOrchestrator.
+
 Safety rules enforced by this module:
 - This file is NEVER imported by backend/app, by CI workflows, or by the
   default production runtime. It is intended for explicit local execution only.
 - Provider Gate authorization is checked before the API key is read.
 - The API key is read only from OPENAI_API_KEY and is never logged or persisted.
 - No raw prompt or raw response is persisted by this module.
-- A conservative pre-call spend check combines a fixed output-token ceiling
-  with an upper-bound input-token estimate. The tracker also records actual
-  post-call usage and acts as a circuit breaker for subsequent calls.
-
-The provider account's own billing controls remain an independent safety layer.
-The local pre-call estimate is a guard, not a substitute for provider billing
-limits or final invoice accounting.
+- Pre-call estimation is exposed to the orchestrator; it is not authorization.
+- Real usage is exposed to the orchestrator for definitive accounting.
 """
 from __future__ import annotations
 
 import os
 import time
-from dataclasses import dataclass
 from typing import Any
 
 from .adapters import ProviderResponse
 from .guard import require_authorization
+from .spend_tracker import ConfigurationError, InvalidUsage
 
-MAX_TOTAL_USD = 3.00
-MAX_CALL_USD = 0.50
 MAX_OUTPUT_TOKENS = 800
 INPUT_USD_PER_MILLION = 0.15
 OUTPUT_USD_PER_MILLION = 0.60
 
-
-class SpendCeilingExceeded(RuntimeError):
-    """Raised when a local spend ceiling would be exceeded."""
+# Provider/model pricing is adapter configuration, not experiment ceilings.
+MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "gpt-4o-mini": (INPUT_USD_PER_MILLION, OUTPUT_USD_PER_MILLION),
+}
 
 
 class MissingApiKey(RuntimeError):
     """Raised when OPENAI_API_KEY is not set in the environment."""
 
 
-@dataclass
-class SpendTracker:
-    """In-memory spend accounting; never persisted or logged."""
+class ProviderUsageError(InvalidUsage):
+    """Raised when provider usage is absent, incomplete, or inconsistent."""
 
-    total_usd: float = 0.0
 
-    def assert_within_ceiling(self, worst_case_call_usd: float) -> None:
-        """Reject a call before network access when its worst case is too high."""
-        if worst_case_call_usd > MAX_CALL_USD:
-            raise SpendCeilingExceeded(
-                f"Worst-case call estimate ${worst_case_call_usd:.4f} exceeds "
-                f"the ${MAX_CALL_USD:.2f} per-call ceiling."
-            )
-        if self.total_usd + worst_case_call_usd > MAX_TOTAL_USD:
-            raise SpendCeilingExceeded(
-                f"Running total ${self.total_usd:.4f} plus worst-case call "
-                f"${worst_case_call_usd:.4f} would exceed the ${MAX_TOTAL_USD:.2f} "
-                "provider ceiling."
-            )
-
-    def register(self, actual_call_usd: float) -> None:
-        """Record actual usage returned by the provider after a completed call."""
-        self.total_usd += actual_call_usd
-        if self.total_usd > MAX_TOTAL_USD:
-            raise SpendCeilingExceeded(
-                f"Recorded spend ${self.total_usd:.4f} exceeded the "
-                f"${MAX_TOTAL_USD:.2f} provider ceiling."
-            )
+class PricingConfigurationError(ConfigurationError):
+    """Raised when no approved price mapping exists for the configured model."""
 
 
 class OpenAIAdapter:
@@ -74,16 +50,11 @@ class OpenAIAdapter:
 
     name = "openai"
 
-    def __init__(
-        self,
-        model: str = "gpt-4o-mini",
-        spend_tracker: SpendTracker | None = None,
-    ) -> None:
+    def __init__(self, model: str = "gpt-4o-mini") -> None:
         # Structural fail-closed point: authorization is checked before any
         # attempt to read the API key.
         require_authorization()
         self.model = model
-        self._spend_tracker = spend_tracker or SpendTracker()
         self._api_key = os.environ.get("OPENAI_API_KEY")
         if not self._api_key:
             raise MissingApiKey(
@@ -96,20 +67,27 @@ class OpenAIAdapter:
 
         return OpenAI(api_key=self._api_key)
 
-    @staticmethod
-    def _estimate_cost_usd(input_tokens: int, output_tokens: int) -> float:
+    def _pricing(self) -> tuple[float, float]:
+        try:
+            return MODEL_PRICING[self.model]
+        except KeyError as exc:
+            raise PricingConfigurationError(
+                f"No approved pricing mapping for OpenAI model '{self.model}'"
+            ) from exc
+
+    def _estimate_cost_usd(self, input_tokens: int, output_tokens: int) -> float:
+        input_price, output_price = self._pricing()
         return (
-            input_tokens * INPUT_USD_PER_MILLION / 1_000_000
-            + output_tokens * OUTPUT_USD_PER_MILLION / 1_000_000
+            input_tokens * input_price / 1_000_000
+            + output_tokens * output_price / 1_000_000
         )
 
     @staticmethod
     def _conservative_input_token_estimate(messages: list[dict[str, str]]) -> int:
-        """Conservative local estimate used only for the pre-call budget guard.
+        """Estimate input tokens using UTF-8 bytes as a conservative proxy.
 
-        UTF-8 byte length is intentionally used as an upper-bound-oriented
-        approximation for this fixed synthetic benchmark. It is not a billing
-        tokenizer and must not be used as final accounting.
+        This is a pre-call estimate only. It is not a billing tokenizer and
+        must never replace provider-reported usage for final accounting.
         """
         content_bytes = sum(
             len(message.get("content", "").encode("utf-8")) for message in messages
@@ -117,13 +95,26 @@ class OpenAIAdapter:
         message_overhead = 64 * len(messages)
         return content_bytes + message_overhead
 
-    def _preflight_spend(self, messages: list[dict[str, str]]) -> None:
+    def estimate_worst_case_cost(self, *, system_prompt: str | None, user_input: str) -> float:
+        messages: list[dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_input})
         estimated_input_tokens = self._conservative_input_token_estimate(messages)
-        worst_case_cost = self._estimate_cost_usd(
-            estimated_input_tokens,
-            MAX_OUTPUT_TOKENS,
-        )
-        self._spend_tracker.assert_within_ceiling(worst_case_cost)
+        return self._estimate_cost_usd(estimated_input_tokens, MAX_OUTPUT_TOKENS)
+
+    def calculate_real_cost(self, response: ProviderResponse) -> float:
+        input_tokens = response.input_tokens
+        output_tokens = response.output_tokens
+        if input_tokens is None or output_tokens is None:
+            raise ProviderUsageError(
+                "Provider usage is absent or incomplete; real cost cannot be determined"
+            )
+        if not isinstance(input_tokens, int) or not isinstance(output_tokens, int):
+            raise ProviderUsageError("Provider usage token counts are not integers")
+        if input_tokens < 0 or output_tokens < 0:
+            raise ProviderUsageError("Provider usage token counts cannot be negative")
+        return self._estimate_cost_usd(input_tokens, output_tokens)
 
     def analyze(self, *, system_prompt: str | None, user_input: str) -> ProviderResponse:
         messages: list[dict[str, str]] = []
@@ -131,8 +122,8 @@ class OpenAIAdapter:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": user_input})
 
-        # Budget check happens before client creation and before network access.
-        self._preflight_spend(messages)
+        # The ExecutionOrchestrator has already completed financial preflight
+        # and moved the global tracker to RUNNING before this method is called.
         client = self._client()
 
         start = time.monotonic()
@@ -148,15 +139,20 @@ class OpenAIAdapter:
         input_tokens = getattr(usage, "prompt_tokens", None) if usage else None
         output_tokens = getattr(usage, "completion_tokens", None) if usage else None
 
-        if input_tokens is not None and output_tokens is not None:
-            estimated_cost = self._estimate_cost_usd(input_tokens, output_tokens)
-            self._spend_tracker.register(estimated_cost)
-
         text = response.choices[0].message.content or ""
-
         return ProviderResponse(
             text=text,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             latency_ms=latency_ms,
         )
+
+
+__all__ = [
+    "MAX_OUTPUT_TOKENS",
+    "MissingApiKey",
+    "MODEL_PRICING",
+    "OpenAIAdapter",
+    "PricingConfigurationError",
+    "ProviderUsageError",
+]

@@ -6,7 +6,7 @@ from backend.tests.provider_gate.guard import ExternalProviderNotAuthorized
 from backend.tests.provider_gate.openai_local_adapter import (
     MissingApiKey,
     OpenAIAdapter,
-    SpendCeilingExceeded,
+    PricingConfigurationError,
 )
 
 
@@ -46,18 +46,22 @@ def test_adapter_requires_api_key_after_authorization(monkeypatch):
         OpenAIAdapter(model="gpt-4o-mini")
 
 
-def test_preflight_spend_rejects_before_client_creation(monkeypatch):
-    """A worst-case request over the local ceiling is rejected before network access."""
+def test_adapter_exposes_estimate_without_own_spend_tracker(monkeypatch):
+    """Cost estimation remains provider-specific; financial authorization is external."""
     monkeypatch.setenv("ANTIGOLPE_PROVIDER_GATE_AUTHORIZED", "CONFIRMED")
     monkeypatch.setenv("OPENAI_API_KEY", "sk-fake-key-for-testing")
 
     adapter = OpenAIAdapter(model="gpt-4o-mini")
+    estimate = adapter.estimate_worst_case_cost(system_prompt=None, user_input="hello")
 
-    def fail_if_client_created():
-        raise AssertionError("OpenAI client was created before spend preflight")
+    assert estimate > 0
+    assert not hasattr(adapter, "_spend_tracker")
 
-    monkeypatch.setattr(adapter, "_client", fail_if_client_created)
 
-    oversized_input = "x" * 3_500_000
-    with pytest.raises(SpendCeilingExceeded):
-        adapter.analyze(system_prompt=None, user_input=oversized_input)
+def test_adapter_rejects_unknown_model_pricing(monkeypatch):
+    monkeypatch.setenv("ANTIGOLPE_PROVIDER_GATE_AUTHORIZED", "CONFIRMED")
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-fake-key-for-testing")
+
+    adapter = OpenAIAdapter(model="unapproved-model")
+    with pytest.raises(PricingConfigurationError, match="pricing mapping"):
+        adapter.estimate_worst_case_cost(system_prompt=None, user_input="hello")

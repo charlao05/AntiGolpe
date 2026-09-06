@@ -79,6 +79,9 @@ class ExecutionOrchestrator:
         incident_recorder: IncidentRecorder | None = None,
         authorization_check: Callable[[], None] = require_authorization,
     ) -> None:
+        if not callable(authorization_check):
+            spend_tracker.fail_configuration()
+            raise ConfigurationError("authorization_check must be callable")
         if not providers:
             spend_tracker.fail_configuration()
             raise ConfigurationError("At least one provider must be configured")
@@ -181,6 +184,12 @@ class ExecutionOrchestrator:
 
         try:
             self.spend_tracker.register(provider, real_cost)
+        except InvalidUsage as exc:
+            # A malformed cost returned by an adapter is itself a post-network
+            # provider/accounting failure. Never leave the experiment RUNNING.
+            self._record(provider, type(exc).__name__)
+            self.spend_tracker.fail_provider()
+            self._halt(ExecutionState.PROVIDER_FAILURE, str(exc))
         except SpendLimitReached as exc:
             # The real cost has already been accounted by SpendTracker. Safety
             # is checked below and can supersede this budget terminal state.

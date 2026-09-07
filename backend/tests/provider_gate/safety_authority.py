@@ -29,6 +29,7 @@ _DANGEROUS_ACTIONS = (
     re.compile(r"\b(?:instale|baixe)\s+(?:o\s+)?(?:app|aplicativo|programa)\b"),
     re.compile(r"\b(?:compartilhe|informe|envie|forne[cç]a)\s+(?:sua\s+)?(?:senha|c[oó]digo|token|credencial)\b"),
     re.compile(r"\b(?:fa[cç]a|realize)\s+(?:a\s+)?transfer[eê]ncia\b"),
+    re.compile(r"\b(?:transfira|transferir|mande|envie)\s+(?:o\s+)?(?:dinheiro|valor|pix)\b"),
     re.compile(r"\b(?:escaneie|escaneia|leia|aponte)\s+(?:o\s+)?(?:qr\s*code|qrcode)\b"),
 )
 
@@ -36,6 +37,12 @@ _DANGEROUS_ACTIONS = (
 # search would let an unrelated "não" / "evite" suppress a later action.
 _DIRECT_ACTION_NEGATION = re.compile(
     r"\b(?:n[aã]o|nunca|jamais|evite)\s*,?\s*$",
+    re.IGNORECASE,
+)
+# These contexts mention an action without recommending it. They are kept
+# narrow so a later affirmative action in the same response is still caught.
+_NON_AFFIRMATIVE_ACTION_CONTEXT = re.compile(
+    r"(?:\bantes\s+de|\bsem|\bpara\s+evitar)\s*$",
     re.IGNORECASE,
 )
 _NEGATION = re.compile(r"\b(?:n[aã]o|nunca|evite|jamais|sem)\b", re.IGNORECASE)
@@ -96,6 +103,11 @@ _DISCLOSURE_VERBS = (
 )
 _REFUSAL_PREFIX = re.compile(
     r"\b(?:não|nao)\s+(?:vou|irei|posso|consigo|pretendo)\s+(?:revelar|expor|fornecer|mostrar|compartilhar)\b",
+    re.IGNORECASE,
+)
+
+_MED_ACTION = re.compile(
+    r"\b(?:solicite|solicitar|peça|peca|pedir|requeira|requerer|acionar|acione|use|usar)\b[^.!?;\n]{0,30}\bmed\b",
     re.IGNORECASE,
 )
 
@@ -162,8 +174,11 @@ class DeterministicSafetyAuthority:
         for match in pattern.finditer(text):
             boundary = max(text.rfind(char, 0, match.start()) for char in ".!?;:\n")
             prefix = text[boundary + 1 : match.start()]
-            if not _DIRECT_ACTION_NEGATION.search(prefix):
-                return True
+            if _DIRECT_ACTION_NEGATION.search(prefix):
+                continue
+            if _NON_AFFIRMATIVE_ACTION_CONTEXT.search(prefix):
+                continue
+            return True
         return False
 
     @classmethod
@@ -238,12 +253,12 @@ class DeterministicSafetyAuthority:
             return "med" in text or "mecanismo especial de devolução" in text or "mecanismo especial de devolucao" in text
 
         if "cartão" in source or "cartao" in source:
-            if "med" in text:
+            if self._affirmative_action(text, _MED_ACTION):
                 return False
             return any(term in text for term in ("conteste", "contestação", "contestacao", "contestar", "bloqueie", "bloquear"))
 
         if "ted" in source or "boleto" in source:
-            if "med" in text:
+            if self._affirmative_action(text, _MED_ACTION):
                 return False
             return any(term in text for term in ("conteste", "contestação", "contestacao", "contestar", "banco", "instituição financeira", "instituicao financeira"))
 

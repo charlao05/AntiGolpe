@@ -32,6 +32,12 @@ _DANGEROUS_ACTIONS = (
     re.compile(r"\b(?:escaneie|escaneia|leia|aponte)\s+(?:o\s+)?(?:qr\s*code|qrcode)\b"),
 )
 
+# D1 action negation must be attached to the matched action. A clause-wide
+# search would let an unrelated "não" / "evite" suppress a later action.
+_DIRECT_ACTION_NEGATION = re.compile(
+    r"\b(?:n[aã]o|nunca|jamais|evite)\s*,?\s*$",
+    re.IGNORECASE,
+)
 _NEGATION = re.compile(r"\b(?:n[aã]o|nunca|evite|jamais|sem)\b", re.IGNORECASE)
 
 _CPF = re.compile(r"\b\d{3}[.\s-]?\d{3}[.\s-]?\d{3}[.\s-]?\d{2}\b")
@@ -156,7 +162,7 @@ class DeterministicSafetyAuthority:
         for match in pattern.finditer(text):
             boundary = max(text.rfind(char, 0, match.start()) for char in ".!?;:\n")
             prefix = text[boundary + 1 : match.start()]
-            if not _NEGATION.search(prefix):
+            if not _DIRECT_ACTION_NEGATION.search(prefix):
                 return True
         return False
 

@@ -40,7 +40,7 @@ _NEGATED_RECOMMENDATION = re.compile(
     re.IGNORECASE,
 )
 _NEGATION = re.compile(r"\b(?:n[aã]o|nunca|evite|jamais|sem)\b", re.IGNORECASE)
-_ASSERTION_BREAK = re.compile(r"(?:,|;|\b(?:mas|por[eé]m|contudo|todavia)\b)\s*$", re.IGNORECASE)
+_ASSERTION_BREAK = re.compile(r"(?:,\s*|\b(?:mas|por[eé]m|contudo|todavia)\b\s+)", re.IGNORECASE)
 
 _CPF = re.compile(r"\b\d{3}[.\s-]?\d{3}[.\s-]?\d{3}[.\s-]?\d{2}\b")
 _PHONE = re.compile(r"\b(?:\+?55[\s-]?)?(?:\(?\d{2}\)?[\s-]?)?9\d{4}[\s-]?\d{4}\b")
@@ -236,11 +236,12 @@ class DeterministicSafetyAuthority:
     def _affirmative_phrase(text: str, phrase: str) -> bool:
         start = text.find(phrase)
         while start >= 0:
-            boundary = max(text.rfind(char, 0, start) for char in ".!?;:\n")
-            prefix = text[boundary + 1 : start]
+            sentence_boundary = max(text.rfind(char, 0, start) for char in ".!?;:\n")
+            prefix = text[sentence_boundary + 1 : start]
+            breaks = list(_ASSERTION_BREAK.finditer(prefix))
+            if breaks:
+                prefix = prefix[breaks[-1].end() :]
             if not _NEGATION.search(prefix):
-                return True
-            if _ASSERTION_BREAK.search(prefix):
                 return True
             start = text.find(phrase, start + len(phrase))
         return False

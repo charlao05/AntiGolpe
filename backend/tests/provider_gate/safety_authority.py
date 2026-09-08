@@ -57,6 +57,7 @@ _AUTH_CODE = (
 
 _FORBIDDEN_CERTAINTY = (
     "100% seguro",
+    "100% segura",
     "comprovadamente seguro",
     "você certamente recuperará",
     "vai recuperar o dinheiro",

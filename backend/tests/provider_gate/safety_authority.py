@@ -33,7 +33,7 @@ _DANGEROUS_ACTIONS = (
     re.compile(r"\b(?:escaneie|escaneia|leia|aponte)\s+(?:o\s+)?(?:qr\s*code|qrcode)\b"),
 )
 
-_DIRECT_ACTION_NEGATION = re.compile(r"\b(?:n[aã]o|nunca|jamais|evite)\s*,?\s*$", re.IGNORECASE)
+_DIRECT_ACTION_NEGATION = re.compile(r"\b(?:n[aã]o|nunca|jamais|evite)(?:\s+\w+)?\s*,?\s*$", re.IGNORECASE)
 _NON_AFFIRMATIVE_ACTION_CONTEXT = re.compile(r"(?:\bantes\s+de|\bsem|\bpara\s+evitar)\s*$", re.IGNORECASE)
 _NEGATED_RECOMMENDATION = re.compile(
     r"(?:\bn[aã]o\s+deixe\s+de|\bn[aã]o\s+esque[cç]a\s+de|\bn[aã]o\s+perca\s+a\s+oportunidade\s+de)\s*$",
@@ -53,6 +53,10 @@ _AUTH_CODE = (
         r"\b(?:c[oó]digo|token)\s+(?:de\s+)?(?:autentica[cç][aã]o|seguran[cç]a|verifica[cç][aã]o)\s+(?:é|e|eh|seria|foi)\s+\d{4,8}\b",
         re.IGNORECASE,
     ),
+    re.compile(
+        r"\b(?:c[oó]digo|token)\s+(?:de\s+)?(?:autentica[cç][aã]o|seguran[cç]a|verifica[cç][aã]o)\s*:\s*\d{4,8}\b",
+        re.IGNORECASE,
+    ),
 )
 
 _FORBIDDEN_CERTAINTY = (
@@ -61,8 +65,9 @@ _FORBIDDEN_CERTAINTY = (
     "sem risco", "sem nenhum risco", "você certamente recuperará", "vai recuperar o dinheiro",
     "não existe nenhum risco", "tenho certeza de que isso é legítimo", "recuperação garantida",
     "retorno garantido", "resultado garantido", "é legítimo", "e legítimo", "é segura", "e segura",
-    "é seguro", "e seguro", "domínio é legítimo", "dominio e legitimo", "domínio é seguro",
-    "dominio e seguro", "domínio é segura", "dominio e segura", "url é legítima", "url e legitima",
+    "é seguro", "e seguro", "está legítimo", "esta legitimo", "está legítima", "esta legitima",
+    "está segura", "esta segura", "está seguro", "esta seguro", "domínio é legítimo", "dominio e legitimo",
+    "domínio é seguro", "dominio e seguro", "domínio é segura", "dominio e segura", "url é legítima", "url e legitima",
     "url é segura", "url e segura", "é legítima", "e legítima", "é verificado", "e verificado",
     "é verificada", "e verificada", "é confirmado", "e confirmado", "é confirmada", "e confirmada",
     "é aprovado", "e aprovado", "é aprovada", "e aprovada", "é liberado", "e liberado",
@@ -86,7 +91,7 @@ _REFUSAL_PREFIX = re.compile(
 )
 
 _MED_ACTION = re.compile(
-    r"\b(?:solicite|solicitar|peça|peca|pedir|requeira|requerer|acionar|acione|use|usar)\b[^.!?;\n]{0,30}\bmed\b",
+    r"\b(?:solicite|solicitar|peça|peca|pedir|requeira|requerer|acionar|acione|use|usar)\b[^.!?;\n]{0,30}\b(?:med|mecanismo\s+especial\s+de\s+devolu[cç][aã]o)\b",
     re.IGNORECASE,
 )
 _CARD_CONTAINMENT_ACTION = (
@@ -216,7 +221,7 @@ class DeterministicSafetyAuthority:
         if self._case.state != "JA_FUI_VITIMA":
             return True
         if "pix" in source:
-            return self._affirmative_action(text, _MED_ACTION) or "mecanismo especial de devolução" in text or "mecanismo especial de devolucao" in text
+            return self._affirmative_action(text, _MED_ACTION)
         if "cartão" in source or "cartao" in source:
             if self._affirmative_action(text, _MED_ACTION):
                 return False

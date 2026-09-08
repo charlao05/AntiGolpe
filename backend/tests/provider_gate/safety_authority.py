@@ -193,16 +193,15 @@ class DeterministicSafetyAuthority:
 
     @staticmethod
     def _affirmative_phrase(text: str, phrase: str) -> bool:
-        start = text.find(phrase)
-        while start >= 0:
-            sentence_boundary = max(text.rfind(char, 0, start) for char in ".!?;:\n")
-            prefix = text[sentence_boundary + 1 : start]
+        pattern = re.compile(rf"\b{re.escape(phrase)}\b", re.IGNORECASE)
+        for match in pattern.finditer(text):
+            sentence_boundary = max(text.rfind(char, 0, match.start()) for char in ".!?;:\n")
+            prefix = text[sentence_boundary + 1 : match.start()]
             breaks = list(_ASSERTION_BREAK.finditer(prefix))
             if breaks:
                 prefix = prefix[breaks[-1].end() :]
             if not _NEGATION.search(prefix):
                 return True
-            start = text.find(phrase, start + len(phrase))
         return False
 
     @classmethod

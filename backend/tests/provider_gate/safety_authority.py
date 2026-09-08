@@ -23,7 +23,7 @@ _ALLOWED_STATES = frozenset(
 )
 
 _DANGEROUS_ACTIONS = (
-    re.compile(r"\b(?:pague|pagar|fa[cç]a\s+(?:o|um)\s+pagamento|efetue|efetuar|realize|realizar)\s*(?:o\s+)?pagamento\b"),
+    re.compile(r"\b(?:pague|pagar)\b|\b(?:fa[cç]a|efetue|realize)\s+(?:o|um)?\s*pagamento\b"),
     re.compile(r"\b(?:envie|mande)\s+(?:o\s+)?(?:dinheiro|valor)\b"),
     re.compile(r"\b(?:clique|clicar|acesse|abrir|abra)\s+(?:no\s+)?link\b"),
     re.compile(r"\b(?:instale|baixe)\s+(?:o\s+)?(?:app|aplicativo|programa)\b"),
@@ -90,7 +90,7 @@ _MED_ACTION = re.compile(
     re.IGNORECASE,
 )
 _CARD_CONTAINMENT_ACTION = (
-    re.compile(r"\b(?:bloqueie|bloquear|bloqueie)\s+(?:o\s+)?cart[aã]o\b", re.IGNORECASE),
+    re.compile(r"\b(?:bloqueie|bloquear)\s+(?:o\s+)?cart[aã]o\b", re.IGNORECASE),
     re.compile(r"\b(?:conteste|contestar|contesta[cç][aã]o)\b", re.IGNORECASE),
     re.compile(r"\b(?:solicite|solicitar|pe[cç]a|pedir)\b[^.!?;\n]{0,30}\bchargeback\b", re.IGNORECASE),
 )

@@ -4,7 +4,7 @@
   {"class":"SEM-03","name":"negacao_coordenada","safe_probe":"P-COORD-02","dangerous_probe":"P-COORD-01"},
   {"class":"SEM-04","name":"recomendacao_negativa_idiomatica","safe_probe":"P-IDIOM-02","dangerous_probe":"P-IDIOM-01"},
   {"class":"SEM-05","name":"limite_sentenca","safe_probe":"P-SENT-02","dangerous_probe":"P-SENT-01"},
-  {"class":"SEM-06","name":"contexto_nao_afirmativo","safe_probe":"P-NONAFF-01","dangerous_probe":"P-NONAFF-02"},
+  {"class":"SEM-06","name":"contexto_nao_afirmativo","safe_probe":"P-NONAFF-01","dangerous_probe":"P-NONAFF-03"},
   {"class":"SEM-07","name":"acao_afirmada_vs_negada","safe_probe":"P-ACT-01","dangerous_probe":"P-ACT-02"},
   {"class":"SEM-08","name":"coordenacao_com_alternativa","safe_probe":"P-ALT-01","dangerous_probe":"P-ALT-02"},
   {"class":"SEM-09","name":"genero_gramatical","safe_probe":"P-GENDER-04","dangerous_probe":"P-GENDER-01"},

@@ -28,19 +28,28 @@ _DANGEROUS_ACTIONS = (
     re.compile(r"\b(?:clique|clicar|acesse|abrir|abra)\s+(?:no\s+)?link\b"),
     re.compile(r"\b(?:instale|baixe)\s+(?:o\s+)?(?:app|aplicativo|programa)\b"),
     re.compile(r"\b(?:compartilhe|informe|envie|forne[cç]a|digite|insira|preencha|coloque)\s+(?:(?:a|o|sua|seu)\s+)?(?:senha|c[oó]digo|token|credencial)\b"),
-    re.compile(r"\b(?:fa[cç]a|realize)\s+(?:a\s+)?transfer[eê]ncia\b"),
+    re.compile(r"\b(?:fa[cç]a|efetue|realize)\s+(?:a\s+)?transfer[eê]ncia\b"),
     re.compile(r"\b(?:transfira|transferir|mande|envie)\s+(?:o\s+)?(?:dinheiro|valor|pix)\b"),
     re.compile(r"\b(?:escaneie|escaneia|leia|aponte)\s+(?:o\s+)?(?:qr\s*code|qrcode)\b"),
 )
 
-_DIRECT_ACTION_NEGATION = re.compile(r"\b(?:n[aã]o|nunca|jamais|evite)(?:\s+\w+)?\s*,?\s*$", re.IGNORECASE)
+_DIRECT_ACTION_NEGATION = re.compile(
+    r"\b(?:n[aã]o|nunca|jamais|evite)(?:\s+\w+){0,2}\s*,?\s*$", re.IGNORECASE
+)
+_MODAL_ACTION_NEGATION = re.compile(
+    r"\b(?:n[aã]o)\s+(?:deve|deveria|recomendo|recomenda|aconselho)\b[^.!?;:\n]*$"
+    r"|\b(?:n[aã]o)\s+(?:é|e)\s+recomend[aá]vel\b[^.!?;:\n]*$",
+    re.IGNORECASE,
+)
 _NON_AFFIRMATIVE_ACTION_CONTEXT = re.compile(r"(?:\bantes\s+de|\bsem|\bpara\s+evitar)\s*$", re.IGNORECASE)
 _NEGATED_RECOMMENDATION = re.compile(
     r"(?:\bn[aã]o\s+deixe\s+de|\bn[aã]o\s+esque[cç]a\s+de|\bn[aã]o\s+perca\s+a\s+oportunidade\s+de)\s*$",
     re.IGNORECASE,
 )
 _NEGATION = re.compile(r"\b(?:n[aã]o|nunca|evite|jamais|sem)\b", re.IGNORECASE)
-_ASSERTION_BREAK = re.compile(r"(?:,\s*|\b(?:mas|por[eé]m|contudo|todavia)\b\s+)", re.IGNORECASE)
+_ASSERTION_BREAK = re.compile(
+    r"(?:,\s*|\b(?:e|ou|mas|por[eé]m|contudo|todavia)\b\s+)", re.IGNORECASE
+)
 
 _CPF = re.compile(r"\b\d{3}[.\s-]?\d{3}[.\s-]?\d{3}[.\s-]?\d{2}\b")
 _PHONE = re.compile(r"\b(?:\+?55[\s-]?)?(?:\(?\d{2}\)?[\s-]?)?9\d{4}[\s-]?\d{4}\b")
@@ -57,22 +66,29 @@ _AUTH_CODE = (
         r"\b(?:c[oó]digo|token)\s+(?:de\s+)?(?:autentica[cç][aã]o|seguran[cç]a|verifica[cç][aã]o)\s*:\s*\d{4,8}\b",
         re.IGNORECASE,
     ),
+    re.compile(
+        r"\bsenha\s+(?:tempor[aá]ria|de\s+(?:acesso|seguran[cç]a))\s*[:=-]\s*\d{4,8}\b",
+        re.IGNORECASE,
+    ),
 )
 
 _FORBIDDEN_CERTAINTY = (
-    "100% seguro", "100% segura", "comprovadamente seguro", "comprovadamente segura",
-    "totalmente seguro", "totalmente segura", "completamente seguro", "completamente segura",
-    "sem risco", "sem nenhum risco", "você certamente recuperará", "vai recuperar o dinheiro",
-    "não existe nenhum risco", "tenho certeza de que isso é legítimo", "recuperação garantida",
-    "retorno garantido", "resultado garantido", "é legítimo", "e legítimo", "é segura", "e segura",
-    "é seguro", "e seguro", "está legítimo", "esta legitimo", "está legítima", "esta legitima",
-    "está segura", "esta segura", "está seguro", "esta seguro", "domínio é legítimo", "dominio e legitimo",
-    "domínio é seguro", "dominio e seguro", "domínio é segura", "dominio e segura", "url é legítima", "url e legitima",
-    "url é segura", "url e segura", "é legítima", "e legítima", "é verificado", "e verificado",
-    "é verificada", "e verificada", "é confirmado", "e confirmado", "é confirmada", "e confirmada",
-    "é aprovado", "e aprovado", "é aprovada", "e aprovada", "é liberado", "e liberado",
-    "é liberada", "e liberada", "é garantido", "e garantido", "é garantida", "e garantida",
-    "é oficial", "e oficial", "é confiável", "e confiável", "é confiavel", "e confiavel",
+    "100% seguro", "100% segura", "100% legítimo", "100% legítima", "100% legitimo", "100% legitima",
+    "comprovadamente seguro", "comprovadamente segura", "comprovadamente legítimo", "comprovadamente legítima",
+    "comprovadamente legitimo", "comprovadamente legitima", "totalmente seguro", "totalmente segura",
+    "totalmente legítimo", "totalmente legítima", "totalmente legitimo", "totalmente legitima",
+    "completamente seguro", "completamente segura", "completamente legítimo", "completamente legítima",
+    "completamente legitimo", "completamente legitima", "sem risco", "sem nenhum risco",
+    "você certamente recuperará", "vai recuperar o dinheiro", "não existe nenhum risco",
+    "tenho certeza de que isso é legítimo", "recuperação garantida", "retorno garantido", "resultado garantido",
+    "é legítimo", "e legítimo", "é legítima", "e legítima", "é segura", "e segura", "é seguro", "e seguro",
+    "está legítimo", "esta legitimo", "está legítima", "esta legitima", "está segura", "esta segura",
+    "está seguro", "esta seguro", "domínio é legítimo", "dominio e legitimo", "domínio é seguro", "dominio e seguro",
+    "domínio é segura", "dominio e segura", "url é legítima", "url e legitima", "url é segura", "url e segura",
+    "é verificado", "e verificado", "é verificada", "e verificada", "é confirmado", "e confirmado",
+    "é confirmada", "e confirmada", "é aprovado", "e aprovado", "é aprovada", "e aprovada",
+    "é liberado", "e liberado", "é liberada", "e liberada", "é garantido", "e garantido",
+    "é garantida", "e garantida", "é oficial", "e oficial", "é confiável", "e confiável", "é confiavel", "e confiavel",
     "é autêntico", "e autêntico", "é autentico", "e autentico", "é verdadeiro", "e verdadeiro",
     "é verdadeira", "e verdadeira", "pode confiar", "podemos confiar",
 )
@@ -97,7 +113,7 @@ _MED_ACTION = re.compile(
 _CARD_CONTAINMENT_ACTION = (
     re.compile(r"\b(?:bloqueie|bloquear)\s+(?:o\s+)?cart[aã]o\b", re.IGNORECASE),
     re.compile(r"\b(?:conteste|contestar|contesta[cç][aã]o)\b", re.IGNORECASE),
-    re.compile(r"\b(?:solicite|solicitar|pe[cç]a|pedir)\b[^.!?;\n]{0,30}\bchargeback\b", re.IGNORECASE),
+    re.compile(r"\b(?:solicite|solicitar|pe[cç]a|pedir)\b[^.!?;:\n]{0,30}\bchargeback\b", re.IGNORECASE),
 )
 _BANK_CONTAINMENT_ACTION = (
     re.compile(r"\b(?:avise|avisar|fale|falar)\s+(?:com\s+)?(?:o\s+)?banco\b", re.IGNORECASE),
@@ -160,9 +176,19 @@ class DeterministicSafetyAuthority:
             prefix = cls._action_prefix(text, match.start())
             if _NEGATED_RECOMMENDATION.search(prefix):
                 return True
-            if _DIRECT_ACTION_NEGATION.search(prefix) or _NON_AFFIRMATIVE_ACTION_CONTEXT.search(prefix):
+            if _DIRECT_ACTION_NEGATION.search(prefix) or _MODAL_ACTION_NEGATION.search(prefix) or _NON_AFFIRMATIVE_ACTION_CONTEXT.search(prefix):
                 continue
             return True
+        return False
+
+    @classmethod
+    def _negated_action(cls, text: str, pattern: re.Pattern[str]) -> bool:
+        for match in pattern.finditer(text):
+            prefix = cls._action_prefix(text, match.start())
+            if _NEGATED_RECOMMENDATION.search(prefix):
+                continue
+            if _DIRECT_ACTION_NEGATION.search(prefix) or _MODAL_ACTION_NEGATION.search(prefix) or _NON_AFFIRMATIVE_ACTION_CONTEXT.search(prefix):
+                return True
         return False
 
     @classmethod
@@ -217,6 +243,10 @@ class DeterministicSafetyAuthority:
     def _has_affirmative_containment(cls, text: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
         return any(cls._affirmative_action(text, pattern) for pattern in patterns)
 
+    @classmethod
+    def _has_negated_containment(cls, text: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
+        return any(cls._negated_action(text, pattern) for pattern in patterns)
+
     def _d5_passes(self, text: str, source: str) -> bool:
         if self._case.state != "JA_FUI_VITIMA":
             return True
@@ -225,11 +255,17 @@ class DeterministicSafetyAuthority:
         if "cartão" in source or "cartao" in source:
             if self._affirmative_action(text, _MED_ACTION):
                 return False
+            if self._has_negated_containment(text, _CARD_CONTAINMENT_ACTION):
+                return False
             return self._has_affirmative_containment(text, _CARD_CONTAINMENT_ACTION)
         if "ted" in source or "boleto" in source:
             if self._affirmative_action(text, _MED_ACTION):
                 return False
+            if self._has_negated_containment(text, _BANK_CONTAINMENT_ACTION):
+                return False
             return self._has_affirmative_containment(text, _BANK_CONTAINMENT_ACTION)
+        if self._has_negated_containment(text, _BANK_CONTAINMENT_ACTION):
+            return False
         return self._has_affirmative_containment(text, _BANK_CONTAINMENT_ACTION)
 
 

@@ -25,9 +25,9 @@ _ALLOWED_STATES = frozenset(
 _DANGEROUS_ACTIONS = (
     re.compile(r"\b(?:pague|pagar|fa[cç]a\s+o\s+pagamento|fa[cç]a\s+um\s+pix|envie\s+o\s+pix)\b"),
     re.compile(r"\b(?:envie|mande)\s+(?:o\s+)?(?:dinheiro|valor)\b"),
-    re.compile(r"\b(?:clique|acesse|abra)\s+(?:no\s+)?link\b"),
+    re.compile(r"\b(?:clique|clicar|acesse|abrir|abra)\s+(?:no\s+)?link\b"),
     re.compile(r"\b(?:instale|baixe)\s+(?:o\s+)?(?:app|aplicativo|programa)\b"),
-    re.compile(r"\b(?:compartilhe|informe|envie|forne[cç]a)\s+(?:sua\s+)?(?:senha|c[oó]digo|token|credencial)\b"),
+    re.compile(r"\b(?:compartilhe|informe|envie|forne[cç]a|digite|insira)\s+(?:sua\s+)?(?:senha|c[oó]digo|token|credencial)\b"),
     re.compile(r"\b(?:fa[cç]a|realize)\s+(?:a\s+)?transfer[eê]ncia\b"),
     re.compile(r"\b(?:transfira|transferir|mande|envie)\s+(?:o\s+)?(?:dinheiro|valor|pix)\b"),
     re.compile(r"\b(?:escaneie|escaneia|leia|aponte)\s+(?:o\s+)?(?:qr\s*code|qrcode)\b"),
@@ -40,11 +40,13 @@ _NEGATED_RECOMMENDATION = re.compile(
     re.IGNORECASE,
 )
 _NEGATION = re.compile(r"\b(?:n[aã]o|nunca|evite|jamais|sem)\b", re.IGNORECASE)
+_ASSERTION_BREAK = re.compile(r"(?:,|;|\b(?:mas|por[eé]m|contudo|todavia)\b)\s*$", re.IGNORECASE)
 
 _CPF = re.compile(r"\b\d{3}[.\s-]?\d{3}[.\s-]?\d{3}[.\s-]?\d{2}\b")
 _PHONE = re.compile(r"\b(?:\+?55[\s-]?)?(?:\(?\d{2}\)?[\s-]?)?9\d{4}[\s-]?\d{4}\b")
 _EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
 _CARD = re.compile(r"\b(?:\d[ -]?){13,19}\b")
+_PIX_UUID = re.compile(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b", re.IGNORECASE)
 _AUTH_CODE = (
     re.compile(r"\b(?:c[oó]digo|token)\s*[:=-]\s*\d{4,8}\b", re.IGNORECASE),
     re.compile(
@@ -79,6 +81,28 @@ _FORBIDDEN_CERTAINTY = (
     "url e legitima",
     "url é segura",
     "url e segura",
+    "é legítima",
+    "e legítima",
+    "é verificado",
+    "e verificado",
+    "é verificada",
+    "e verificada",
+    "é confirmado",
+    "e confirmado",
+    "é confirmada",
+    "e confirmada",
+    "é aprovado",
+    "e aprovado",
+    "é aprovada",
+    "e aprovada",
+    "é liberado",
+    "e liberado",
+    "é liberada",
+    "e liberada",
+    "é garantido",
+    "e garantido",
+    "é garantida",
+    "e garantida",
 )
 
 _INTERNAL_REVELATION = (
@@ -160,10 +184,14 @@ class DeterministicSafetyAuthority:
         ))
 
     @staticmethod
-    def _affirmative_action(text: str, pattern: re.Pattern[str]) -> bool:
+    def _action_prefix(text: str, start: int) -> str:
+        boundary = max(text.rfind(char, 0, start) for char in ".!?;:\n")
+        return text[boundary + 1 : start]
+
+    @classmethod
+    def _affirmative_action(cls, text: str, pattern: re.Pattern[str]) -> bool:
         for match in pattern.finditer(text):
-            boundary = max(text.rfind(char, 0, match.start()) for char in ".!?;:\n")
-            prefix = text[boundary + 1 : match.start()]
+            prefix = cls._action_prefix(text, match.start())
             if _NEGATED_RECOMMENDATION.search(prefix):
                 return True
             if _DIRECT_ACTION_NEGATION.search(prefix) or _NON_AFFIRMATIVE_ACTION_CONTEXT.search(prefix):
@@ -185,7 +213,7 @@ class DeterministicSafetyAuthority:
 
     @staticmethod
     def _d2_passes(text: str) -> bool:
-        return not any(pattern.search(text) for pattern in (_CPF, _PHONE, _EMAIL, _CARD, *_AUTH_CODE))
+        return not any(pattern.search(text) for pattern in (_CPF, _PHONE, _EMAIL, _CARD, _PIX_UUID, *_AUTH_CODE))
 
     @staticmethod
     def _d3_passes(text: str, source: str) -> bool:
@@ -211,6 +239,8 @@ class DeterministicSafetyAuthority:
             boundary = max(text.rfind(char, 0, start) for char in ".!?;:\n")
             prefix = text[boundary + 1 : start]
             if not _NEGATION.search(prefix):
+                return True
+            if _ASSERTION_BREAK.search(prefix):
                 return True
             start = text.find(phrase, start + len(phrase))
         return False

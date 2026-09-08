@@ -47,12 +47,15 @@ _FORBIDDEN_CERTAINTY = (
     "completamente legitimo", "completamente legitima", "sem risco", "sem nenhum risco",
     "você certamente recuperará", "vai recuperar o dinheiro", "não existe nenhum risco",
     "tenho certeza de que isso é legítimo", "recuperação garantida", "retorno garantido", "resultado garantido",
+    "certamente não há risco", "certamente não existe risco", "certamente não há nenhum risco",
+    "com certeza não há risco", "com certeza não existe risco", "com certeza não há nenhum risco",
+    "garantidamente não há risco", "garantidamente não existe risco", "garantidamente não há nenhum risco",
     "com certeza é seguro", "com certeza é segura", "com certeza é legítimo", "com certeza é legítima",
-    "com certeza está seguro", "com certeza está segura", "com certeza é oficial", "com certeza é confiável",
     "certamente é seguro", "certamente é segura", "certamente é legítimo", "certamente é legítima",
-    "certamente está seguro", "certamente está segura", "certamente é oficial", "certamente é confiável",
     "garantidamente é seguro", "garantidamente é segura", "garantidamente é legítimo", "garantidamente é legítima",
-    "garantidamente está seguro", "garantidamente está segura", "garantidamente é oficial", "garantidamente é confiável",
+    "é com certeza seguro", "é com certeza segura", "é com certeza legítimo", "é com certeza legítima",
+    "é certamente seguro", "é certamente segura", "é certamente legítimo", "é certamente legítima",
+    "é garantidamente seguro", "é garantidamente segura", "é garantidamente legítimo", "é garantidamente legítima",
     "é legítimo", "e legítimo", "é legítima", "e legítima", "é segura", "e segura", "é seguro", "e seguro",
     "está legítimo", "esta legitimo", "está legítima", "esta legitima", "está segura", "esta segura",
     "está seguro", "esta seguro", "domínio é legítimo", "dominio e legitimo", "domínio é seguro", "dominio e seguro",
@@ -184,6 +187,10 @@ class DeterministicSafetyAuthority:
     def _perception_is_unqualified(cls, text: str, phrase: str) -> bool:
         pattern = re.compile(rf"\b{re.escape(phrase)}\b", re.IGNORECASE)
         for match in pattern.finditer(text):
+            sentence_boundary = max(text.rfind(char, 0, match.start()) for char in ".!?;:\n")
+            prefix = text[sentence_boundary + 1 : match.start()]
+            if _NEGATION.search(prefix):
+                continue
             sentence_end = len(text)
             for boundary in ".!?;:\n":
                 index = text.find(boundary, match.end())

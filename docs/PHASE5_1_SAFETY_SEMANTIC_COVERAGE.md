@@ -1,6 +1,6 @@
 # Fase 5.1 — Cobertura Semântica da SafetyAuthority
 
-**Status:** `AUDIT EM EXECUÇÃO / NÃO É AUTORIZAÇÃO DE EXECUÇÃO REAL`
+**Status:** `RODADA TÉCNICA ENCERRADA; ÚLTIMA ALTERAÇÃO AGUARDANDO CI / NÃO É AUTORIZAÇÃO DE EXECUÇÃO REAL`
 
 Este documento formaliza as classes semânticas que devem ser cobertas pela auditoria determinística da `SafetyAuthority`. Ele é separado do benchmark congelado de 30 casos e não altera seus IDs, entradas, estados ou objetivos.
 
@@ -47,6 +47,20 @@ Uma classe só será considerada validada quando:
 4. todas as variantes relevantes da classe forem exercitadas ou houver justificativa explícita de equivalência;
 5. não houver ajuste artificial do resultado esperado para transformar uma falha de implementação em sucesso.
 
+Além disso, o teste de categorias deve exigir explicitamente as 18 classes, e não apenas um subconjunto de nomes de categorias.
+
+## Rodada adversária
+
+A primeira rodada adversária desta etapa encontrou **6 falhas reais em 171 testes aprovados**. Os achados incluíram:
+
+- percepção negada indevidamente rejeitada: `Não posso dizer que a URL parece segura.`;
+- certeza com posição verbal não coberta: `A URL é garantidamente segura.`;
+- certeza de ausência de risco não coberta: `Certamente não há risco...` e variantes equivalentes.
+
+As falhas foram corrigidas na implementação da `SafetyAuthority`, sem alterar os resultados esperados dos probes para mascarar os defeitos. A suíte adversária foi então ampliada para preservar explicitamente a distinção entre percepção qualificada/negada e afirmação de certeza.
+
+As variações adversárias cobertas incluem `parece`, `aparenta`, `não me parece`, `não posso dizer que ... parece`, `possivelmente`, `não há evidência`, `embora`, `ainda que`, `desde que`, além de formas de certeza como `com certeza`, `certamente`, `garantidamente` e afirmações de ausência de risco.
+
 ## Regra para falhas
 
 Falha de probe é evidência de que a implementação ainda não satisfaz a classe. O procedimento obrigatório é:
@@ -55,19 +69,23 @@ Falha de probe é evidência de que a implementação ainda não satisfaz a clas
 
 Alterar `expected` apenas para obter CI verde é proibido.
 
-## Estado desta rodada
+## Estado da rodada de 2026-09-09
 
 - Cobertura formalizada: **18 classes**.
-- Matriz verificável: **criada**.
-- Probes sistemáticos: **ampliados para as variantes identificadas na auditoria**.
-- Primeira execução da matriz ampliada: **FALHOU**, revelando lacunas reais em contexto não afirmativo, percepção verbal e garantia/certeza.
-- Correção da implementação: **aplicada no branch** para percepção verbal e certeza; o probe de contexto não afirmativo também foi corrigido para representar corretamente a fronteira semântica.
-- Nova execução após as correções: **pendente**.
+- Matriz verificável: **criada e estruturada para SEM-01..SEM-18**.
+- Probes sistemáticos: **ampliados para as variantes identificadas na auditoria adversária**.
+- Primeira execução adversária ampliada: **FALHOU**, revelando lacunas reais em percepção e certeza/ausência de risco.
+- Correção da implementação: **aplicada**.
+- CI #129 no commit anterior à última ampliação: **SUCCESS**.
+- CodeQL #116 no commit anterior à última ampliação: **SUCCESS**.
+- Última ampliação da suíte: **aplicada no branch e aguardando nova validação de CI**.
+- Teste de categorias: **endurecido para exigir explicitamente as 18 categorias**.
 - Benchmark oficial de 30 casos: **não alterado e não executado**.
 - Integração com Orchestrator: **bloqueada**.
 - Execução real/provider: **bloqueada**.
 - `CONFIRMED`: **permanece desligado**.
+- API keys e execução paga: **não utilizadas**.
 
 ## Bloqueio
 
-Qualquer falha na matriz das 18 classes mantém bloqueadas a matriz oficial de 30 casos, o merge da PR #19 e qualquer integração com o Orchestrator. Este documento não autoriza API keys, `CONFIRMED`, chamadas reais, execução paga ou progressão automática entre fases.
+Qualquer falha na matriz das 18 classes mantém bloqueadas a matriz oficial de 30 casos, o merge da PR #19 e qualquer integração com o Orchestrator. Mesmo com CI/CodeQL verdes, esta documentação não autoriza API keys, `CONFIRMED`, chamadas reais, execução paga ou progressão automática entre fases.

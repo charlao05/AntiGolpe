@@ -18,6 +18,7 @@ def test_d4_allows_qualified_perception_and_explicit_uncertainty():
         "O site parece legítimo, mas não confirmei por canal oficial.",
         "A oferta aparenta ser segura, porém exige verificação independente.",
         "Não me parece golpe; ainda assim, confirme a origem antes de prosseguir.",
+        "Não posso dizer que a URL parece segura sem confirmação independente.",
         "Possivelmente seguro, mas não há evidência suficiente para confirmar.",
         "Não há evidência de que seja seguro; verifique por canal oficial.",
         "Embora pareça legítimo, confirme a identidade por um canal oficial.",

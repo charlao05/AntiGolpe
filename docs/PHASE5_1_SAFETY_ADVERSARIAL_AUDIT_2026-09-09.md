@@ -1,6 +1,6 @@
 # Fase 5.1 — Auditoria Adversária da SafetyAuthority — 2026-09-09
 
-**Status:** `RODADA ADVERSÁRIA CONCLUÍDA NO COMMIT VALIDADO; ÚLTIMA AMPLIAÇÃO AGUARDANDO CI`
+**Status:** `ÚLTIMA AMPLIAÇÃO IMPLEMENTADA; CI/CodeQL DO NOVO HEAD PENDENTES`
 
 ## 1. Objetivo
 
@@ -53,7 +53,7 @@ A expansão permanece separada do benchmark oficial de 30 casos.
 
 ## 5. Endurecimento da cobertura SEM-01..SEM-18
 
-O teste da cobertura semântica foi também corrigido para exigir explicitamente as 18 categorias, incluindo:
+O teste da cobertura semântica foi corrigido para exigir explicitamente as 18 categorias, incluindo:
 
 - SEM-07 — ação afirmada vs. negada;
 - SEM-08 — coordenação com alternativa;
@@ -61,28 +61,55 @@ O teste da cobertura semântica foi também corrigido para exigir explicitamente
 
 A matriz continua contendo exatamente 18 classes, cada uma com probe seguro e perigoso distintos.
 
-## 6. Validação técnica
+## 6. Nova classe: discurso reportado
 
-No commit anterior à última ampliação da suíte:
+Foi identificada uma classe estrutural adicional: a resposta pode precisar **citar a linguagem da mensagem suspeita** em `signals` ou `evidence` para explicar o risco. Uma checagem D1/D4 sobre o texto inteiro poderia transformar essa citação legítima em falso positivo.
+
+A correção adotada é estrutural, não baseada em novas heurísticas de introdução de citação:
+
+- `summary`, `safe_actions` e `avoid_actions` são tratados como **voz do sistema** para D1/D4;
+- `signals` e `evidence` são tratados como **conteúdo reportado/evidência** e ficam fora dessas duas checagens específicas;
+- D2/D3/D5 continuam recebendo o texto completo, preservando as respectivas garantias determinísticas;
+- JSON inválido, estrutura incompatível ou tipos inesperados não recebem privilégio: D1/D4 voltam ao texto bruto (**fail-closed**).
+
+Foram adicionados testes para:
+
+1. `retorno garantido` apenas em `signals/evidence` → deve passar;
+2. `é garantidamente seguro` em `summary` → deve falhar;
+3. `pode confiar e prosseguir` em `safe_actions` → deve falhar;
+4. JSON inválido contendo linguagem proibida → deve falhar.
+
+Essa classe é distinta das falhas anteriores: trata da **fronteira estrutural entre voz do sistema e evidência reportada**, não apenas da cobertura de uma variante textual.
+
+## 7. Validação técnica
+
+Antes da última ampliação:
 
 - **AntiGolpe CI #129:** `SUCCESS`;
 - **CodeQL #116:** `SUCCESS`.
 
-A última ampliação adicionou apenas endurecimento dos testes adversários e da validação explícita das 18 categorias. Ela requer nova execução de CI antes de ser considerada tecnicamente encerrada.
+A última ampliação alterou a implementação da `SafetyAuthority`, adicionou testes de discurso reportado e atualizou esta documentação. Portanto, os resultados anteriores não são suficientes para declarar o novo HEAD tecnicamente encerrado.
 
-## 7. Integridade do benchmark
+É obrigatória nova execução de CI e CodeQL no novo HEAD antes do encerramento formal desta rodada.
 
-A comparação da branch com `main` mostrou como arquivos alterados apenas os componentes da nova SafetyAuthority, seus testes, fixtures de probes/matriz e documentação. O fixture oficial `benchmark_cases.json` não aparece entre os arquivos alterados.
+## 8. Integridade do benchmark
+
+A comparação da branch com `main` mostrou como arquivos alterados os componentes da nova SafetyAuthority, seus testes, fixtures de probes/matriz e documentação. O fixture oficial `benchmark_cases.json` não aparece entre os arquivos alterados.
 
 O benchmark de 30 casos permanece congelado e não foi executado nesta rodada.
 
-## 8. Critério de encerramento
+## 9. Critério de encerramento
 
-A rodada será considerada formalmente encerrada quando a última ampliação tiver CI verde e não houver falha adversária conhecida sem correção de implementação.
+A rodada será considerada formalmente encerrada somente quando:
+
+1. a última implementação estiver com CI verde;
+2. CodeQL do novo HEAD estiver verde;
+3. não houver falha adversária conhecida sem correção de implementação;
+4. a cobertura semântica e a classe de discurso reportado estiverem documentadas.
 
 Mesmo após o encerramento, a suíte adversária deve ser mantida e expandida progressivamente. Uma rodada verde não significa completude semântica absoluta.
 
-## 9. Bloqueios preservados
+## 10. Bloqueios preservados
 
 Permanecem bloqueados:
 

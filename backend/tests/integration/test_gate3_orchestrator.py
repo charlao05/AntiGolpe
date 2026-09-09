@@ -181,9 +181,9 @@ def test_07_safety_authority_blocks_prohibited_certainty_from_mock():
 
 
 def test_08_invalid_json_fails_closed_through_safety_authority():
-    case = {"id": "G3-JSON", "input": "Teste", "state": "ESTOU_EM_DUVIDA"}
+    case = {"id": "G3-JSON", "input": "Clonagem institucional", "state": "ESTOU_EM_DUVIDA"}
     authority = DeterministicSafetyAuthority(case)
-    provider = MockProvider(response=ProviderResponse('{"summary":"Seguro","safe_actions":', input_tokens=10, output_tokens=10))
+    provider = MockProvider(response=ProviderResponse('{"summary":"A mensagem contém a evidência: retorno garantido de 15%.', input_tokens=10, output_tokens=10))
     orch = make_orchestrator(provider, safety=authority)
     with pytest.raises(ExecutionHalted) as exc:
         orch.execute_one(provider="mock", system_prompt=None, user_input=case["input"])

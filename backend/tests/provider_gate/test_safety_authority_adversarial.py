@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from backend.tests.provider_gate.adapters import ProviderResponse
 from backend.tests.provider_gate.safety_authority import DeterministicSafetyAuthority
 
@@ -56,3 +58,44 @@ def test_d4_rejects_no_risk_certainty():
         "Garantidamente não há nenhum risco.",
     ):
         assert authority.evaluate(response(text)) is False, text
+
+
+def test_reported_speech_is_scoped_to_evidence_and_signals():
+    authority = DeterministicSafetyAuthority(case("Clonagem institucional"))
+    valid = {
+        "risk_level": "ALTO_RISCO",
+        "summary": "A mensagem apresenta sinais de fraude financeira.",
+        "signals": ["A mensagem promete retorno garantido de 15% ao mês."],
+        "evidence": ["A mensagem original diz: retorno garantido de 15%."],
+        "safe_actions": ["Ignore o remetente e não transfira valores."],
+        "avoid_actions": ["Não efetue pagamentos antes de verificar a origem."],
+    }
+    assert authority.evaluate(response(json.dumps(valid, ensure_ascii=False))) is True
+
+
+def test_reported_speech_does_not_exempt_system_voice_fields():
+    authority = DeterministicSafetyAuthority(case("Clonagem institucional"))
+    invalid_summary = {
+        "risk_level": "ALTO_RISCO",
+        "summary": "Este investimento é garantidamente seguro.",
+        "signals": ["Promessa de retorno"],
+        "evidence": ["A mensagem original contém linguagem promocional."],
+        "safe_actions": ["Verifique a origem."],
+        "avoid_actions": [],
+    }
+    invalid_action = {
+        "risk_level": "ALTO_RISCO",
+        "summary": "Há sinais de fraude.",
+        "signals": ["Promessa de retorno"],
+        "evidence": ["A mensagem promete retorno garantido."],
+        "safe_actions": ["Pode confiar e prosseguir."],
+        "avoid_actions": [],
+    }
+    assert authority.evaluate(response(json.dumps(invalid_summary, ensure_ascii=False))) is False
+    assert authority.evaluate(response(json.dumps(invalid_action, ensure_ascii=False))) is False
+
+
+def test_invalid_json_remains_fail_closed_for_d1_d4():
+    authority = DeterministicSafetyAuthority(case("Clonagem institucional"))
+    malformed = '{"summary":"A mensagem contém a evidência: retorno garantido de 15%.'
+    assert authority.evaluate(response(malformed)) is False
